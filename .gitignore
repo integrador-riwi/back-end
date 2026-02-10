@@ -10,6 +10,7 @@ logs/
 *.log
 npm-debug.log*
 pnpm-debug.log*
+.idea/
 
 # OS / Editor
 .DS_Store
