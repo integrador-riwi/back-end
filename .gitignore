@@ -1,0 +1,22 @@
+# Node
+node_modules/
+.pnpm-store/
+
+# Env files
+.env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Coverage / temp
+coverage/
+tmp/
