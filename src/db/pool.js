@@ -13,24 +13,26 @@ const pool = new Pool({
   connectionTimeoutMillis: config.db.connectionTimeoutMillis
 });
 
-pool.on('connect', () => {
-  console.log('✅ Database connection established');
-});
-
-pool.on('error', (err) => {
-  console.error('❌ Unexpected database error:', err);
-});
-
-const testConnection = async () => {
-  try {
-    const client = await pool.connect();
-    console.log('✅ Database connected successfully');
-    client.release();
-  } catch (err) {
-    console.error('❌ Database connection failed:', err.message);
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
   }
-};
+});
 
-testConnection();
+async function getUsers() {
+  try {
+    const result = await pool.query('SELECT * FROM users');
+    return result.rows;
+  } catch (error) {
+    console.error('Database error:', error);
+    throw error;
+  }
+}
+
+// Then call it when needed:
+getUsers().then(users => console.log(users));
 
 export default pool;
+
+
