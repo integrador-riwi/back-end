@@ -1,31 +1,36 @@
 import { Pool } from 'pg';
-import dotenv from 'dotenv';
-
-// IMPORTANT: Load environment variables first
-dotenv.config();
-
-console.log('Password loaded:', process.env.DB_PASSWORD ? 'YES ✓' : 'NO ✗');
-console.log('Password length:', process.env.DB_PASSWORD?.length);
+import config from '../config/env.js';
 
 const pool = new Pool({
-  host: 'db.yushxqtjeqlaphtqheai.supabase.co',
-  port: 5432,
-  database: 'postgres',
-  user: 'postgres',
-  password: process.env.DB_PASSWORD,
-  ssl: false,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  host: config.db.host,
+  port: config.db.port,
+  database: config.db.database,
+  user: config.db.user,
+  password: config.db.password,
+  ssl: config.db.ssl,
+  max: config.db.max,
+  idleTimeoutMillis: config.db.idleTimeoutMillis,
+  connectionTimeoutMillis: config.db.connectionTimeoutMillis
 });
 
-// Test connection
-pool.query('SELECT * FROM users', (err, res) => {
-  if (err) {
-    console.error('❌ Database connection failed:', err);
-  } else {
-    console.log('✅ Database connected successfully at:', res);
-  }
+pool.on('connect', () => {
+  console.log('✅ Database connection established');
 });
+
+pool.on('error', (err) => {
+  console.error('❌ Unexpected database error:', err);
+});
+
+const testConnection = async () => {
+  try {
+    const client = await pool.connect();
+    console.log('✅ Database connected successfully');
+    client.release();
+  } catch (err) {
+    console.error('❌ Database connection failed:', err.message);
+  }
+};
+
+testConnection();
 
 export default pool;
