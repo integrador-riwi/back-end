@@ -1,8 +1,5 @@
 import { Pool } from 'pg';
-import { setDefaultResultOrder } from 'dns';
 import config from '../config/env.js';
-
-setDefaultResultOrder('ipv4first');
 
 const poolConfig = config.db.connectionString
   ? {
@@ -15,7 +12,7 @@ const poolConfig = config.db.connectionString
       database: config.db.database,
       user: config.db.user,
       password: config.db.password,
-      ssl: config.db.ssl,
+      ssl: config.db.ssl ? { rejectUnauthorized: false } : false,
       max: config.db.max,
       idleTimeoutMillis: config.db.idleTimeoutMillis,
       connectionTimeoutMillis: config.db.connectionTimeoutMillis
