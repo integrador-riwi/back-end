@@ -1,6 +1,10 @@
 import 'dotenv/config';
 
-const requiredEnvVars = ['DB_PASSWORD', 'JWT_SECRET'];
+const isProduction = process.env.NODE_ENV === 'production';
+
+const requiredEnvVars = isProduction 
+  ? ['JWT_SECRET']
+  : ['DB_PASSWORD', 'JWT_SECRET'];
 
 const missing = requiredEnvVars.filter(key => !process.env[key]);
 if (missing.length > 0 && process.env.NODE_ENV !== 'test') {
@@ -18,12 +22,15 @@ export const config = {
   },
   
   db: {
+    connectionString: process.env.DATABASE_URL || null,
     host: process.env.DB_HOST || 'db.yushxqtjeqlaphtqheai.supabase.co',
     port: parseInt(process.env.DB_PORT) || 5432,
     database: process.env.DB_NAME || 'postgres',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD,
-    ssl: process.env.DB_SSL === 'true' || false,
+    ssl: process.env.DATABASE_URL 
+      ? { rejectUnauthorized: false }
+      : process.env.DB_SSL === 'true' || false,
     max: parseInt(process.env.DB_POOL_MAX) || 20,
     idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT) || 30000,
     connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT) || 2000
