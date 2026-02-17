@@ -1,8 +1,17 @@
 import { Pool } from 'pg';
-import dotenv from 'dotenv';
+import config from '../config/env.js';
 
-// IMPORTANT: Load environment variables first
-dotenv.config();
+const pool = new Pool({
+  host: config.db.host,
+  port: config.db.port,
+  database: config.db.database,
+  user: config.db.user,
+  password: config.db.password,
+  ssl: config.db.ssl,
+  max: config.db.max,
+  idleTimeoutMillis: config.db.idleTimeoutMillis,
+  connectionTimeoutMillis: config.db.connectionTimeoutMillis
+});
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
