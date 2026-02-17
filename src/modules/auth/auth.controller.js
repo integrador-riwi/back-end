@@ -11,8 +11,19 @@ const COOKIE_OPTIONS = {
   path: '/'
 };
 
+const REFRESH_COOKIE_OPTIONS = {
+  ...COOKIE_OPTIONS,
+  maxAge: 30 * 24 * 60 * 60 * 1000
+};
+
+const getClientInfo = (req) => ({
+  userAgent: req.headers['user-agent'] || null,
+  ipAddress: req.ip || req.connection.remoteAddress || null
+});
+
 export const register = asyncHandler(async (req, res) => {
   const { name, email, password, role, documentNumber, documentType, clan } = req.body;
+  const { userAgent, ipAddress } = getClientInfo(req);
 
   const result = await AuthService.register({
     name,
@@ -22,53 +33,51 @@ export const register = asyncHandler(async (req, res) => {
     documentNumber,
     documentType,
     clan
-  });
+  }, userAgent, ipAddress);
 
   res.cookie('token', result.token, COOKIE_OPTIONS);
-  res.cookie('refreshToken', result.refreshToken, {
-    ...COOKIE_OPTIONS,
-    maxAge: 30 * 24 * 60 * 60 * 1000
-  });
+  res.cookie('refreshToken', result.refreshToken, REFRESH_COOKIE_OPTIONS);
 
   return created(res, result);
 });
 
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
+  const { userAgent, ipAddress } = getClientInfo(req);
 
-  const result = await AuthService.login(email, password);
+  const result = await AuthService.login(email, password, userAgent, ipAddress);
 
   res.cookie('token', result.token, COOKIE_OPTIONS);
-  res.cookie('refreshToken', result.refreshToken, {
-    ...COOKIE_OPTIONS,
-    maxAge: 30 * 24 * 60 * 60 * 1000
-  });
+  res.cookie('refreshToken', result.refreshToken, REFRESH_COOKIE_OPTIONS);
 
   return success(res, result);
 });
 
 export const logout = asyncHandler(async (req, res) => {
+  const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+  const userId = req.user?.id_user;
+
+  const result = await AuthService.logout(refreshToken, userId);
+
   res.clearCookie('token', { path: '/' });
   res.clearCookie('refreshToken', { path: '/' });
 
-  const result = await AuthService.logout();
   return success(res, result);
 });
 
 export const refresh = asyncHandler(async (req, res) => {
-  const userId = req.user?.id_user;
+  const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
-  if (!userId) {
-    return error(res, 'Token de refresco requerido', 401);
+  if (!refreshToken) {
+    return error(res, 'Refresh token requerido', 401);
   }
 
-  const result = await AuthService.refreshToken(userId);
+  const { userAgent, ipAddress } = getClientInfo(req);
+
+  const result = await AuthService.refreshTokens(refreshToken, userAgent, ipAddress);
 
   res.cookie('token', result.token, COOKIE_OPTIONS);
-  res.cookie('refreshToken', result.refreshToken, {
-    ...COOKIE_OPTIONS,
-    maxAge: 30 * 24 * 60 * 60 * 1000
-  });
+  res.cookie('refreshToken', result.refreshToken, REFRESH_COOKIE_OPTIONS);
 
   return success(res, { message: 'Token actualizado', token: result.token });
 });

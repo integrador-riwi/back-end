@@ -109,6 +109,54 @@ export const deactivate = async (id_user) => {
   return result.rows.length > 0;
 };
 
+export const saveRefreshToken = async ({ userId, tokenHash, expiresAt, userAgent = null, ipAddress = null }) => {
+  const query = `
+    INSERT INTO refresh_tokens (user_id, token_hash, expires_at, user_agent, ip_address)
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING id_token, user_id, expires_at, created_at
+  `;
+  const result = await pool.query(query, [userId, tokenHash, expiresAt, userAgent, ipAddress]);
+  return result.rows[0];
+};
+
+export const findRefreshToken = async (tokenHash) => {
+  const query = `
+    SELECT rt.*, u.name, u.email, u.role, u.is_active
+    FROM refresh_tokens rt
+    JOIN users u ON rt.user_id = u.id_user
+    WHERE rt.token_hash = $1 AND rt.revoked_at IS NULL AND rt.expires_at > NOW()
+  `;
+  const result = await pool.query(query, [tokenHash]);
+  return result.rows[0] || null;
+};
+
+export const revokeRefreshToken = async (tokenHash, revokedBy = null) => {
+  const query = `
+    UPDATE refresh_tokens
+    SET revoked_at = NOW(), revoked_by = $2
+    WHERE token_hash = $1 AND revoked_at IS NULL
+    RETURNING id_token
+  `;
+  const result = await pool.query(query, [tokenHash, revokedBy]);
+  return result.rows.length > 0;
+};
+
+export const revokeAllUserTokens = async (userId, revokedBy = null) => {
+  const query = `
+    UPDATE refresh_tokens
+    SET revoked_at = NOW(), revoked_by = $2
+    WHERE user_id = $1 AND revoked_at IS NULL
+  `;
+  const result = await pool.query(query, [userId, revokedBy]);
+  return result.rowCount;
+};
+
+export const cleanExpiredTokens = async () => {
+  const query = 'DELETE FROM refresh_tokens WHERE expires_at < NOW() OR revoked_at IS NOT NULL';
+  const result = await pool.query(query);
+  return result.rowCount;
+};
+
 export default {
   findByEmail,
   findById,
@@ -118,5 +166,10 @@ export default {
   createProfile,
   getProfile,
   updateProfile,
-  deactivate
+  deactivate,
+  saveRefreshToken,
+  findRefreshToken,
+  revokeRefreshToken,
+  revokeAllUserTokens,
+  cleanExpiredTokens
 };
