@@ -1,23 +1,16 @@
-import { Client } from 'pg';
+import { Pool } from 'pg';
 
-const client = new Client({
-    host: 'db.yushxqtjeqlaphtqheai.supabase.co',
-    port: 5432,
-    database: 'postgres',
-    user: 'postgres',
-    password: 'k%r06£7h38^W[p=+Gsr:',
-    ssl: { rejectUnauthorized: false }
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 });
 
-async function testDirectConnection() {
-    try {
-        await client.connect();
-        const res = await client.query('SELECT * FROM users');
-        console.log('✓ Database time:', res.rows[0]);
-        await client.end();
-    } catch (error) {
-        console.error('✗ Connection failed:', error);
-    }
-}
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
+  process.exit(-1);
+});
 
-testDirectConnection()
+export default pool;
