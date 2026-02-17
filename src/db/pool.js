@@ -1,5 +1,8 @@
 import { Pool } from 'pg';
+import { setDefaultResultOrder } from 'dns';
 import config from '../config/env.js';
+
+setDefaultResultOrder('ipv4first');
 
 const poolConfig = config.db.connectionString
   ? {
