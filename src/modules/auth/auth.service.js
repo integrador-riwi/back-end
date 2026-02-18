@@ -10,23 +10,23 @@ export const register = async (userData) => {
   const { name, email, password, role = 'CODER', documentNumber, documentType = 'CC', clan } = userData;
 
   if (!name || !email || !documentNumber) {
-    throw new ValidationError('Nombre, email y número de documento son requeridos');
+    throw new ValidationError('Name, email, and document number are required.');
   }
 
   const finalPassword = password || documentNumber.toString();
 
   if (finalPassword.length < 6) {
-    throw new ValidationError('La contraseña debe tener al menos 6 caracteres');
+    throw new ValidationError('The password must be at least 6 characters long.');
   }
 
   const existingUser = await AuthRepository.findByEmail(email);
   if (existingUser) {
-    throw new ConflictError('El email ya está registrado');
+    throw new ConflictError('The email address is already registered.');
   }
 
   const existingDocument = await AuthRepository.findByDocument(documentNumber);
   if (existingDocument) {
-    throw new ConflictError('El número de documento ya está registrado');
+    throw new ConflictError('The document number is already registered.');
   }
 
   const passwordHash = await bcrypt.hash(finalPassword, SALT_ROUNDS);
@@ -68,13 +68,13 @@ export const register = async (userData) => {
 
 export const login = async (email, password) => {
   if (!email || !password) {
-    throw new ValidationError('Email y contraseña son requeridos');
+    throw new ValidationError('Email and password are required');
   }
 
   const user = await AuthRepository.findByEmail(email);
   
   if (!user) {
-    throw new UnauthorizedError('Credenciales inválidas');
+    throw new UnauthorizedError('Invalid credentials');
   }
 
   if (user.is_active === false) {
@@ -84,7 +84,7 @@ export const login = async (email, password) => {
   const passwordMatch = await bcrypt.compare(password, user.encrypted_password || '');
   
   if (!passwordMatch) {
-    throw new UnauthorizedError('Credenciales inválidas');
+    throw new UnauthorizedError('Invalid credentials');
   }
 
   const token = generateToken({
@@ -112,18 +112,18 @@ export const login = async (email, password) => {
 };
 
 export const logout = async () => {
-  return { message: 'Sesión cerrada exitosamente' };
+  return { message: 'Session successfully closed' };
 };
 
 export const refreshToken = async (userId) => {
   const user = await AuthRepository.findById(userId);
   
   if (!user) {
-    throw new UnauthorizedError('Usuario no encontrado');
+    throw new UnauthorizedError('User not found');
   }
 
   if (user.is_active === false) {
-    throw new UnauthorizedError('Usuario desactivado');
+    throw new UnauthorizedError('User disabled');
   }
 
   const token = generateToken({
@@ -144,7 +144,7 @@ export const getMe = async (userId) => {
   const user = await AuthRepository.findById(userId);
   
   if (!user) {
-    throw new NotFoundError('Usuario no encontrado');
+    throw new NotFoundError('User not found');
   }
 
   const profile = await AuthRepository.getProfile(userId);
@@ -163,29 +163,29 @@ export const getMe = async (userId) => {
 
 export const changePassword = async (userId, currentPassword, newPassword) => {
   if (!currentPassword || !newPassword) {
-    throw new ValidationError('Contraseña actual y nueva contraseña son requeridas');
+    throw new ValidationError('Current password and new password are required');
   }
 
   if (newPassword.length < 6) {
-    throw new ValidationError('La nueva contraseña debe tener al menos 6 caracteres');
+    throw new ValidationError('The new password must be at least 6 characters long.');
   }
 
   const user = await AuthRepository.findById(userId);
   
   if (!user) {
-    throw new NotFoundError('Usuario no encontrado');
+    throw new NotFoundError('User not found');
   }
 
   const passwordMatch = await bcrypt.compare(currentPassword, user.encrypted_password || '');
   
   if (!passwordMatch) {
-    throw new UnauthorizedError('La contraseña actual es incorrecta');
+    throw new UnauthorizedError('The current password is incorrect.');
   }
 
   const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
   await AuthRepository.updatePassword(userId, passwordHash);
 
-  return { message: 'Contraseña actualizada exitosamente' };
+  return { message: 'Password successfully updated' };
 };
 
 export const updateProfile = async (userId, profileData) => {

@@ -4,11 +4,11 @@ import { ForbiddenError } from './errorHandler.js';
 export const hasRole = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user) {
-      return error(res, 'Usuario no autenticado', 401);
+      return error(res, 'Unauthenticated user', 401);
     }
 
     if (!allowedRoles.includes(req.user.role)) {
-      return error(res, 'No tienes permisos para realizar esta acción', 403);
+      return error(res, 'You do not have permission to perform this action.', 403);
     }
 
     next();
@@ -35,7 +35,7 @@ export const canViewProjects = hasRole('ADMIN', 'CODER', 'TL_DEVELOPMENT', 'TL_S
 
 export const isOwnerOrAdmin = (req, res, next) => {
   if (!req.user) {
-    return error(res, 'Usuario no autenticado', 401);
+    return error(res, 'Unauthenticated user', 401);
   }
 
   const resourceUserId = parseInt(req.params.userId || req.params.id_user || req.body.user_id);
@@ -44,12 +44,12 @@ export const isOwnerOrAdmin = (req, res, next) => {
     return next();
   }
 
-  return error(res, 'No tienes permisos para acceder a este recurso', 403);
+  return error(res, 'You do not have permission to access this resource.', 403);
 };
 
 export const isTeamLeaderOrAdmin = async (req, res, next) => {
   if (!req.user) {
-    return error(res, 'Usuario no autenticado', 401);
+    return error(res, 'Unauthenticated user', 401);
   }
 
   if (req.user.role === 'ADMIN') {
@@ -59,7 +59,7 @@ export const isTeamLeaderOrAdmin = async (req, res, next) => {
   const teamId = parseInt(req.params.teamId || req.params.id_team || req.body.id_team);
   
   if (!teamId) {
-    return error(res, 'ID de equipo requerido', 400);
+      return error(res, 'Equipment ID required', 400);
   }
 
   next();

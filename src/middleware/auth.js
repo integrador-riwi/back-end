@@ -16,7 +16,7 @@ export const authenticate = async (req, res, next) => {
     }
 
     if (!token) {
-      throw new UnauthorizedError('Token de autenticación requerido');
+      throw new UnauthorizedError('Authentication token required');
     }
 
     const decoded = verifyToken(token);
@@ -31,12 +31,12 @@ export const authenticate = async (req, res, next) => {
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
-      return error(res, 'Token expirado', 401);
+      return error(res, 'Token expired', 401);
     }
     if (err.name === 'JsonWebTokenError') {
-      return error(res, 'Token inválido', 401);
+      return error(res, 'Invalid token', 401);
     }
-    return error(res, err.message || 'No autorizado', 401);
+    return error(res, err.message || 'Unauthorized', 401);
   }
 };
 
