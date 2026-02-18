@@ -1,12 +1,38 @@
 import bcrypt from 'bcryptjs';
 import AuthRepository from './auth.repository.js';
-import { generateToken, generateRefreshToken } from '../../utils/jwt.js';
+import { generateToken, generateRefreshToken, hashToken, getTokenExpiration } from '../../utils/jwt.js';
 import { ValidationError, UnauthorizedError, NotFoundError, ConflictError } from '../../middleware/errorHandler.js';
 import config from '../../config/env.js';
 
 const SALT_ROUNDS = 12;
 
-export const register = async (userData) => {
+const createTokens = async (user, userAgent = null, ipAddress = null) => {
+  const token = generateToken({
+    id_user: user.id_user,
+    email: user.email,
+    role: user.role,
+    name: user.name
+  });
+
+  const refreshToken = generateRefreshToken({
+    id_user: user.id_user
+  });
+
+  const tokenHash = hashToken(refreshToken);
+  const expiresAt = getTokenExpiration(refreshToken);
+
+  await AuthRepository.saveRefreshToken({
+    userId: user.id_user,
+    tokenHash,
+    expiresAt,
+    userAgent,
+    ipAddress
+  });
+
+  return { token, refreshToken };
+};
+
+export const register = async (userData, userAgent = null, ipAddress = null) => {
   const { name, email, password, role = 'CODER', documentNumber, documentType = 'CC', clan } = userData;
 
   if (!name || !email || !documentNumber) {
@@ -43,16 +69,7 @@ export const register = async (userData) => {
 
   await AuthRepository.createProfile(user.id_user, { clan });
 
-  const token = generateToken({
-    id_user: user.id_user,
-    email: user.email,
-    role: user.role,
-    name: user.name
-  });
-
-  const refreshToken = generateRefreshToken({
-    id_user: user.id_user
-  });
+  const tokens = await createTokens(user, userAgent, ipAddress);
 
   return {
     user: {
@@ -61,12 +78,12 @@ export const register = async (userData) => {
       email: user.email,
       role: user.role
     },
-    token,
-    refreshToken
+    token: tokens.token,
+    refreshToken: tokens.refreshToken
   };
 };
 
-export const login = async (email, password) => {
+export const login = async (email, password, userAgent = null, ipAddress = null) => {
   if (!email || !password) {
     throw new ValidationError('Email and password are required');
   }
@@ -87,16 +104,7 @@ export const login = async (email, password) => {
     throw new UnauthorizedError('Invalid credentials');
   }
 
-  const token = generateToken({
-    id_user: user.id_user,
-    email: user.email,
-    role: user.role,
-    name: user.name
-  });
-
-  const refreshToken = generateRefreshToken({
-    id_user: user.id_user
-  });
+  const tokens = await createTokens(user, userAgent, ipAddress);
 
   return {
     user: {
@@ -106,38 +114,50 @@ export const login = async (email, password) => {
       role: user.role,
       clan: user.clan
     },
-    token,
-    refreshToken
+    token: tokens.token,
+    refreshToken: tokens.refreshToken
   };
 };
 
-export const logout = async () => {
-  return { message: 'Session successfully closed' };
+export const logout = async (refreshToken, userId) => {
+  if (refreshToken) {
+    const tokenHash = hashToken(refreshToken);
+    await AuthRepository.revokeRefreshToken(tokenHash, userId);
+  }
+  return { message: 'Sesión cerrada exitosamente' };
 };
 
-export const refreshToken = async (userId) => {
-  const user = await AuthRepository.findById(userId);
-  
-  if (!user) {
-    throw new UnauthorizedError('User not found');
+export const refreshTokens = async (oldRefreshToken, userAgent = null, ipAddress = null) => {
+  if (!oldRefreshToken) {
+    throw new ValidationError('Refresh token requerido');
   }
 
-  if (user.is_active === false) {
-    throw new UnauthorizedError('User disabled');
+  const tokenHash = hashToken(oldRefreshToken);
+  const storedToken = await AuthRepository.findRefreshToken(tokenHash);
+
+  if (!storedToken) {
+    throw new UnauthorizedError('Refresh token inválido o expirado');
   }
 
-  const token = generateToken({
-    id_user: user.id_user,
-    email: user.email,
-    role: user.role,
-    name: user.name
-  });
+  if (storedToken.is_active === false) {
+    throw new UnauthorizedError('Usuario desactivado');
+  }
 
-  const newRefreshToken = generateRefreshToken({
-    id_user: user.id_user
-  });
+  await AuthRepository.revokeRefreshToken(tokenHash, storedToken.user_id);
 
-  return { token, refreshToken: newRefreshToken };
+  const user = {
+    id_user: storedToken.user_id,
+    name: storedToken.name,
+    email: storedToken.email,
+    role: storedToken.role
+  };
+
+  const tokens = await createTokens(user, userAgent, ipAddress);
+
+  return {
+    token: tokens.token,
+    refreshToken: tokens.refreshToken
+  };
 };
 
 export const getMe = async (userId) => {
@@ -206,7 +226,7 @@ export default {
   register,
   login,
   logout,
-  refreshToken,
+  refreshTokens,
   getMe,
   changePassword,
   updateProfile
