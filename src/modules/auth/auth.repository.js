@@ -32,13 +32,13 @@ export const create = async ({ name, email, passwordHash, role = 'CODER', docume
   } catch (error) {
     if (error.code === '23505') {
       if (error.constraint?.includes('email')) {
-        throw new ConflictError('El email ya está registrado');
+        throw new ConflictError('The email address is already registered.');
       }
       if (error.constraint?.includes('document_number')) {
-        throw new ConflictError('El número de documento ya está registrado');
+        throw new ConflictError('The document number is already registered.');
       }
     }
-    throw new DatabaseError(`Error al crear usuario: ${error.message}`);
+    throw new DatabaseError(`Error creating user: ${error.message}`);
   }
 };
 
@@ -53,7 +53,7 @@ export const updatePassword = async (id_user, passwordHash) => {
   const result = await pool.query(query, [passwordHash, id_user]);
   
   if (result.rows.length === 0) {
-    throw new NotFoundError('Usuario no encontrado');
+    throw new NotFoundError('User not found');
   }
   
   return result.rows[0];
@@ -73,7 +73,7 @@ export const createProfile = async (user_id, { github_url = null, description = 
     if (error.code === '23505') {
       return null;
     }
-    throw new DatabaseError(`Error al crear perfil: ${error.message}`);
+    throw new DatabaseError(`Error creating profile: ${error.message}`);
   }
 };
 
