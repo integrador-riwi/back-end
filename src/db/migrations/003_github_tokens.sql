@@ -1,0 +1,7 @@
+ALTER TABLE users ADD COLUMN IF NOT EXISTS github_id VARCHAR(50);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS github_username VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS github_token VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS github_refresh_token VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS github_token_expires_at TIMESTAMP;
+
+CREATE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id);

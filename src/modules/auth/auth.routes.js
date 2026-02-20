@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import AuthController from './auth.controller.js';
-import { authenticate } from '../../middleware/auth.js';
+import { authenticate, optionalAuth } from '../../middleware/auth.js';
 import { hasRole } from '../../middleware/rbac.js';
 
 const router = Router();
@@ -22,5 +22,13 @@ router.get('/me', authenticate, AuthController.getMe);
 router.put('/password', authenticate, AuthController.changePassword);
 
 router.put('/profile', authenticate, AuthController.updateProfile);
+
+router.get('/github', authenticate, AuthController.githubAuth);
+
+router.get('/github/callback', optionalAuth, AuthController.githubCallback);
+
+router.get('/github/status', authenticate, AuthController.getGithubStatus);
+
+router.delete('/github', authenticate, AuthController.disconnectGithub);
 
 export default router;

@@ -157,6 +157,76 @@ export const cleanExpiredTokens = async () => {
   return result.rowCount;
 };
 
+export const findByGithubId = async (githubId) => {
+  const query = `
+    SELECT id_user, name, email, role, github_id, github_username, github_token, is_active
+    FROM users
+    WHERE github_id = $1
+  `;
+  const result = await pool.query(query, [githubId]);
+  return result.rows[0] || null;
+};
+
+export const getGithubConnection = async (userId) => {
+  const query = `
+    SELECT github_id, github_username, github_token_expires_at
+    FROM users
+    WHERE id_user = $1
+  `;
+  const result = await pool.query(query, [userId]);
+  return result.rows[0] || null;
+};
+
+export const saveGithubTokens = async (userId, { githubId, githubUsername, accessToken, refreshToken, expiresAt }) => {
+  const query = `
+    UPDATE users
+    SET github_id = $1,
+        github_username = $2,
+        github_token = $3,
+        github_refresh_token = $4,
+        github_token_expires_at = $5
+    WHERE id_user = $6
+    RETURNING id_user, github_id, github_username
+  `;
+
+  const result = await pool.query(query, [
+    githubId,
+    githubUsername,
+    accessToken,
+    refreshToken,
+    expiresAt,
+    userId
+  ]);
+
+  return result.rows[0] || null;
+};
+
+export const disconnectGithub = async (userId) => {
+  const query = `
+    UPDATE users
+    SET github_id = NULL,
+        github_username = NULL,
+        github_token = NULL,
+        github_refresh_token = NULL,
+        github_token_expires_at = NULL
+    WHERE id_user = $1
+    RETURNING id_user
+  `;
+
+  const result = await pool.query(query, [userId]);
+  return result.rows.length > 0;
+};
+
+export const getGithubTokens = async (userId) => {
+  const query = `
+    SELECT github_id, github_username, github_token, github_refresh_token, github_token_expires_at
+    FROM users
+    WHERE id_user = $1
+  `;
+  const result = await pool.query(query, [userId]);
+  return result.rows[0] || null;
+};
+
 export default {
   findByEmail,
   findById,
@@ -171,5 +241,10 @@ export default {
   findRefreshToken,
   revokeRefreshToken,
   revokeAllUserTokens,
-  cleanExpiredTokens
+  cleanExpiredTokens,
+  findByGithubId,
+  getGithubConnection,
+  saveGithubTokens,
+  disconnectGithub,
+  getGithubTokens
 };

@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import AuthRepository from './auth.repository.js';
 import { generateToken, generateRefreshToken, hashToken, getTokenExpiration } from '../../utils/jwt.js';
 import { ValidationError, UnauthorizedError, NotFoundError, ConflictError } from '../../middleware/errorHandler.js';
+import GitHubService from '../../integrations/github.service.js';
 import config from '../../config/env.js';
 
 const SALT_ROUNDS = 12;
@@ -222,6 +223,89 @@ export const updateProfile = async (userId, profileData) => {
   return profile;
 };
 
+export const getGithubAuthUrl = () => {
+  if (!config.github.clientId || !config.github.clientSecret) {
+    throw new ValidationError('GitHub OAuth is not configured');
+  }
+  
+  return GitHubService.getAuthorizationUrl();
+};
+
+export const handleGithubCallback = async (code, userId) => {
+  if (!code) {
+    throw new ValidationError('Authorization code is required');
+  }
+
+  const tokenData = await GitHubService.exchangeCodeForToken(code);
+
+  const githubUser = await GitHubService.getUserInfo(tokenData.accessToken);
+
+  const existingUser = await AuthRepository.findByGithubId(githubUser.id);
+  if (existingUser && existingUser.id_user !== userId) {
+    throw new ConflictError('This GitHub account is already linked to another user');
+  }
+
+  const expiresAt = GitHubService.calculateTokenExpiration(tokenData.expiresIn);
+
+  await AuthRepository.saveGithubTokens(userId, {
+    githubId: githubUser.id,
+    githubUsername: githubUser.login,
+    accessToken: tokenData.accessToken,
+    refreshToken: tokenData.refreshToken,
+    expiresAt
+  });
+
+  return {
+    message: 'GitHub account linked successfully',
+    github: {
+      id: githubUser.id,
+      username: githubUser.login,
+      name: githubUser.name,
+      avatarUrl: githubUser.avatarUrl
+    }
+  };
+};
+
+export const getGithubConnection = async (userId) => {
+  const connection = await AuthRepository.getGithubConnection(userId);
+
+  if (!connection || !connection.github_id) {
+    return {
+      connected: false,
+      github: null
+    };
+  }
+
+  const isExpired = connection.github_token_expires_at && 
+    new Date(connection.github_token_expires_at) < new Date();
+
+  return {
+    connected: true,
+    expired: isExpired,
+    github: {
+      id: connection.github_id,
+      username: connection.github_username,
+      expiresAt: connection.github_token_expires_at
+    }
+  };
+};
+
+export const disconnectGithub = async (userId) => {
+  const tokens = await AuthRepository.getGithubTokens(userId);
+
+  if (tokens?.github_token) {
+    await GitHubService.revokeToken(tokens.github_token);
+  }
+
+  const disconnected = await AuthRepository.disconnectGithub(userId);
+
+  if (!disconnected) {
+    throw new NotFoundError('User not found');
+  }
+
+  return { message: 'GitHub account disconnected successfully' };
+};
+
 export default {
   register,
   login,
@@ -229,5 +313,9 @@ export default {
   refreshTokens,
   getMe,
   changePassword,
-  updateProfile
+  updateProfile,
+  getGithubAuthUrl,
+  handleGithubCallback,
+  getGithubConnection,
+  disconnectGithub
 };
