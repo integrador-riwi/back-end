@@ -303,3 +303,97 @@ Actualiza el perfil del usuario autenticado.
   "code": "CONFLICT"
 }
 ```
+
+---
+
+## GitHub OAuth Integration
+
+Permite conectar la cuenta de GitHub del usuario para futuras integraciones (creación de repositorios, invitaciones, etc.).
+
+### Configuración requerida
+
+Agregar al `.env`:
+```bash
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+GITHUB_REDIRECT_URI=http://localhost:3010/api/auth/github/callback
+```
+
+Crear OAuth App en GitHub: https://github.com/settings/developers
+
+---
+
+### GET /api/auth/github
+
+Inicia el flujo de OAuth, redirige a GitHub para autorización.
+
+**Request:** Autenticación requerida (Bearer token)
+
+**Response:** Redirección a GitHub
+
+---
+
+### GET /api/auth/github/callback
+
+GitHub redirige aquí con el código de autorización.
+
+**Query params:**
+- `code` - Código de autorización de GitHub
+- `error` - (opcional) Error si el usuario denegó acceso
+
+**Response:** Redirección al frontend con resultado:
+- Éxito: `{CLIENT_URL}/settings/github?success=true&username=gh_username`
+- Error: `{CLIENT_URL}/settings/github?error=message`
+
+---
+
+### GET /api/auth/github/status
+
+Obtiene el estado de la conexión con GitHub.
+
+**Request:** Autenticación requerida
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "connected": true,
+    "expired": false,
+    "github": {
+      "id": "12345678",
+      "username": "gh_username",
+      "expiresAt": "2026-03-20T10:00:00Z"
+    }
+  }
+}
+```
+
+Si no está conectado:
+```json
+{
+  "success": true,
+  "data": {
+    "connected": false,
+    "github": null
+  }
+}
+```
+
+---
+
+### DELETE /api/auth/github
+
+Desconecta la cuenta de GitHub del usuario.
+
+**Request:** Autenticación requerida
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "GitHub account disconnected successfully"
+  }
+}
+```

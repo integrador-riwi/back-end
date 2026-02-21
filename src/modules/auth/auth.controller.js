@@ -104,6 +104,53 @@ export const updateProfile = asyncHandler(async (req, res) => {
   return success(res, result);
 });
 
+export const githubAuth = asyncHandler(async (req, res) => {
+  const authUrl = await AuthService.getGithubAuthUrl();
+  return res.redirect(authUrl);
+});
+
+export const githubCallback = asyncHandler(async (req, res) => {
+  const { code, error: githubError } = req.query;
+
+  if (githubError) {
+    const redirectUrl = `${config.client.url}/settings/github?error=${encodeURIComponent(githubError)}`;
+    return res.redirect(redirectUrl);
+  }
+
+  if (!code) {
+    const redirectUrl = `${config.client.url}/settings/github?error=no_code`;
+    return res.redirect(redirectUrl);
+  }
+
+  const userId = req.user?.id_user;
+
+  if (!userId) {
+    const redirectUrl = `${config.client.url}/settings/github?error=not_authenticated`;
+    return res.redirect(redirectUrl);
+  }
+
+  try {
+    const result = await AuthService.handleGithubCallback(code, userId);
+    const redirectUrl = `${config.client.url}/settings/github?success=true&username=${encodeURIComponent(result.github.username)}`;
+    return res.redirect(redirectUrl);
+  } catch (err) {
+    const redirectUrl = `${config.client.url}/settings/github?error=${encodeURIComponent(err.message)}`;
+    return res.redirect(redirectUrl);
+  }
+});
+
+export const getGithubStatus = asyncHandler(async (req, res) => {
+  const userId = req.user.id_user;
+  const result = await AuthService.getGithubConnection(userId);
+  return success(res, result);
+});
+
+export const disconnectGithub = asyncHandler(async (req, res) => {
+  const userId = req.user.id_user;
+  const result = await AuthService.disconnectGithub(userId);
+  return success(res, result);
+});
+
 export default {
   register,
   login,
@@ -111,5 +158,9 @@ export default {
   refresh,
   getMe,
   changePassword,
-  updateProfile
+  updateProfile,
+  githubAuth,
+  githubCallback,
+  getGithubStatus,
+  disconnectGithub
 };

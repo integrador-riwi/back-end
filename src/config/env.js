@@ -1,4 +1,11 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+dotenv.config({ path: join(__dirname, '../../.env') });
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -42,7 +49,10 @@ export const config = {
   
   github: {
     token: process.env.GITHUB_TOKEN || '',
-    webhookSecret: process.env.GITHUB_WEBHOOK_SECRET || ''
+    webhookSecret: process.env.GITHUB_WEBHOOK_SECRET || '',
+    clientId: process.env.GITHUB_CLIENT_ID || '',
+    clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
+    redirectUri: process.env.GITHUB_REDIRECT_URI || 'http://localhost:3010/api/auth/github/callback'
   },
   
   moodle: {
