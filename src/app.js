@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import authRoutes from './modules/auth/auth.routes.js';
 import usersRoutes from './modules/users/users.routes.js';
+import teamsRoutes from './modules/teams/teams.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import config from './config/env.js';
 
@@ -35,6 +36,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/teams', teamsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, error: 'Endpoint no encontrado' });
