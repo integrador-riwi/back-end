@@ -5,25 +5,27 @@ const n8nService = {
   triggerProjectCreated: async (projectData, collaborator) => {
     if (!config.n8n.webhookUrl) {
       console.warn('N8N webhook URL not configured');
-      return;
+      return null;
     }
 
-    await axios.post(`${config.n8n.webhookUrl}/team-created`, {
+    const response = await axios.post(`${config.n8n.webhookUrl}/team-created`, {
       projectId: projectData.id,
       name: projectData.name,
       createdAt: new Date().toISOString(),
       collaboratorUsername: collaborator.githubUsername,
       collaboratorToken: collaborator.githubToken
     });
+    
+    return response.data;
   },
 
   triggerMemberInvited: async (teamData, member) => {
     if (!config.n8n.webhookUrl) {
       console.warn('N8N webhook URL not configured');
-      return;
+      return null;
     }
 
-    await axios.post(`${config.n8n.webhookUrl}/team-member-invited`, {
+    const response = await axios.post(`${config.n8n.webhookUrl}/team-member-invited`, {
       teamId: teamData.id,
       projectId: teamData.projectId,
       repoName: teamData.repoName,
@@ -33,6 +35,8 @@ const n8nService = {
       memberName: member.name,
       role: member.role
     });
+    
+    return response.data;
   }
 };
 

@@ -40,17 +40,9 @@ export const createTeam = async (data, leaderId, userRole = 'TL_DEVELOPMENT') =>
     });
 
     let repoUrl = null;
-    let inviteToken = null;
 
     if (n8nResponse && n8nResponse.data) {
       repoUrl = n8nResponse.data.repositoryUrl || n8nResponse.data.repository_url;
-      inviteToken = leaderWithGithub.github_token;
-      
-      await TeamsRepository.saveTeamProject(team.id_team, {
-        repoName: repoName,
-        repoUrl: repoUrl,
-        inviteToken: inviteToken
-      });
     }
 
     return {
