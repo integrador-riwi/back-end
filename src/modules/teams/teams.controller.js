@@ -149,9 +149,9 @@ export const rejectInvitation = asyncHandler(async (req, res) => {
   return success(res, { message: 'Invitación rechazada', ...result });
 });
 
-// AI Google Search by Description
-export const searchProjects = asyncHandler( async (req, res) => {
-  const { q, limit } = req.query
+// AI ChatGPT Search by Description
+export const searchProjects = asyncHandler(async (req, res) => {
+  const { q, limit, min_similarity, exclude_project } = req.query
 
   if (!q || q.trim() === '') {
     return res.status(400).json({
@@ -160,22 +160,18 @@ export const searchProjects = asyncHandler( async (req, res) => {
     })
   }
 
-  try {
-    const results = await searchProjectByDescription(q.trim(), limit ? parseInt(limit) : 5)
+  const results = await searchProjectByDescription(
+      q.trim(),
+      limit ? parseInt(limit) : 5,
+      min_similarity ? parseFloat(min_similarity) : 0.1,
+      exclude_project ? parseInt(exclude_project) : null
+  )
 
-    return res.status(200).json({
-      success: true,
-      query: q,
-      total: results.length,
-      data: results
-    })
-  } catch (err) {
-    console.error('❌ Error en búsqueda semántica:', err.message)
-    return res.status(500).json({
-      success: false,
-      message: 'Error al procesar la búsqueda'
-    })
-  }
+  return success(res, {
+    query: q,
+    total: results.length,
+    data: results
+  })
 })
 
 export default {
