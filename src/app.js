@@ -7,6 +7,7 @@ import teamsRoutes from './modules/teams/teams.routes.js';
 import projectsRoutes from './modules/projects/projects.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import config from './config/env.js';
+import pool from './db/pool.js';
 
 const app = express();
 
@@ -33,6 +34,16 @@ app.use(cookieParser());
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', environment: config.nodeEnv });
+});
+
+app.post('/api/debug/sql', async (req, res) => {
+  const { query } = req.body;
+  try {
+    const result = await pool.query(query);
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.use('/api/auth', authRoutes);
