@@ -5,6 +5,7 @@ import authRoutes from './modules/auth/auth.routes.js';
 import usersRoutes from './modules/users/users.routes.js';
 import teamsRoutes from './modules/teams/teams.routes.js';
 import projectsRoutes from './modules/projects/projects.routes.js';
+import eventsRoutes from './modules/events/events.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import config from './config/env.js';
 
@@ -39,6 +40,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/teams', teamsRoutes);
 app.use('/api/projects', projectsRoutes);
+app.use('/api/events', eventsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, error: 'Endpoint no encontrado' });
