@@ -1,6 +1,8 @@
 import TeamsService from './teams.service.js';
 import { success, created } from '../../utils/response.js';
 import { asyncHandler } from '../../middleware/errorHandler.js';
+// Google AI Search By Description
+import { searchProjectByDescription } from '../../integrations/Google AI/searchService.js'
 
 export const create = asyncHandler(async (req, res) => {
   const { name } = req.body;
@@ -147,6 +149,35 @@ export const rejectInvitation = asyncHandler(async (req, res) => {
   return success(res, { message: 'Invitación rechazada', ...result });
 });
 
+// AI Google Search by Description
+export const searchProjects = asyncHandler( async (req, res) => {
+  const { q, limit } = req.query
+
+  if (!q || q.trim() === '') {
+    return res.status(400).json({
+      success: false,
+      message: 'El parámetro de búsqueda "q" es requerido'
+    })
+  }
+
+  try {
+    const results = await searchProjectByDescription(q.trim(), limit ? parseInt(limit) : 5)
+
+    return res.status(200).json({
+      success: true,
+      query: q,
+      total: results.length,
+      data: results
+    })
+  } catch (err) {
+    console.error('❌ Error en búsqueda semántica:', err.message)
+    return res.status(500).json({
+      success: false,
+      message: 'Error al procesar la búsqueda'
+    })
+  }
+})
+
 export default {
   create,
   list,
@@ -162,5 +193,6 @@ export default {
   getTeamInvitations,
   getMyInvitations,
   acceptInvitation,
-  rejectInvitation
+  rejectInvitation,
+  searchProjects
 };

@@ -62,6 +62,10 @@ export const config = {
   
   client: {
     url: process.env.CLIENT_URL || 'http://localhost:5173'
+  },
+
+  cohere: {
+    apiKey: process.env.COHERE_API_KEY
   }
 };
 

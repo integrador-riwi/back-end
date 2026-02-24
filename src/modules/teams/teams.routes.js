@@ -11,6 +11,9 @@ router.get('/my-teams', authenticate, TeamsController.getMyTeams);
 
 router.get('/invitations', authenticate, TeamsController.getMyInvitations);
 
+// Search projects by description
+router.get('/search', authenticate, TeamsController.searchProjects)
+
 router.get('/:id', authenticate, TeamsController.get);
 
 router.get('/:id/members', authenticate, TeamsController.getMembers);
