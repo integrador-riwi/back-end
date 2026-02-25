@@ -1,0 +1,46 @@
+{
+  "users": [
+    {
+      "email": "admin@riwi.com",
+      "password": "Admin123!",
+      "role": "ADMIN",
+      "name": "Administrador"
+    },
+    {
+      "email": "coder1@riwi.com",
+      "password": "Coder123!",
+      "role": "CODER",
+      "name": "Coder Uno"
+    },
+    {
+      "email": "coder2@riwi.com",
+      "password": "Coder123!",
+      "role": "CODER",
+      "name": "Coder Dos"
+    },
+    {
+      "email": "coder3@riwi.com",
+      "password": "Coder123!",
+      "role": "CODER",
+      "name": "Coder Tres"
+    },
+    {
+      "email": "tl-development@riwi.com",
+      "password": "TLDev123!",
+      "role": "TL_DEVELOPMENT",
+      "name": "Team Lead Development"
+    },
+    {
+      "email": "tl-softskills@riwi.com",
+      "password": "TLSoft123!",
+      "role": "TL_SOFT_SKILLS",
+      "name": "Team Lead Soft Skills"
+    },
+    {
+      "email": "tl-english@riwi.com",
+      "password": "TLEng123!",
+      "role": "TL_ENGLISH",
+      "name": "Team Lead English"
+    }
+  ]
+}

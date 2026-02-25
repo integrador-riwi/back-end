@@ -24,6 +24,7 @@ router.put('/password', authenticate, AuthController.changePassword);
 router.put('/profile', authenticate, AuthController.updateProfile);
 
 router.get('/github', authenticate, AuthController.githubAuth);
+router.get('/github/url', authenticate, AuthController.githubAuthUrl);
 
 router.get('/github/callback', optionalAuth, AuthController.githubCallback);
 

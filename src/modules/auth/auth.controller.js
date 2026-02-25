@@ -109,6 +109,11 @@ export const githubAuth = asyncHandler(async (req, res) => {
   return res.redirect(authUrl);
 });
 
+export const githubAuthUrl = asyncHandler(async (req, res) => {
+  const authUrl = await AuthService.getGithubAuthUrl();
+  return success(res, { url: authUrl });
+});
+
 export const githubCallback = asyncHandler(async (req, res) => {
   const { code, error: githubError } = req.query;
 
@@ -160,6 +165,7 @@ export default {
   changePassword,
   updateProfile,
   githubAuth,
+  githubAuthUrl,
   githubCallback,
   getGithubStatus,
   disconnectGithub
