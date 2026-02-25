@@ -30,12 +30,7 @@ router.get(
   TeamsController.getAvailable,
 );
 
-router.post(
-  "/",
-  authenticate,
-  hasRole("ADMIN", "TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH", "CODER"),
-  TeamsController.create,
-);
+router.post("/", authenticate, TeamsController.create);
 
 router.put("/:id", authenticate, TeamsController.update);
 
