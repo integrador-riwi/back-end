@@ -5,7 +5,7 @@ import { hasRole } from '../../middleware/rbac.js';
 
 const router = Router();
 
-router.get('/', authenticate, hasRole('ADMIN'), ProjectsController.list);
+router.get('/', authenticate, hasRole('ADMIN', 'CODER'), ProjectsController.list);
 
 router.get('/team/:id', authenticate, ProjectsController.getByTeam);
 
