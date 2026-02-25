@@ -28,6 +28,8 @@ router.get('/github/url', authenticate, AuthController.githubAuthUrl);
 
 router.get('/github/callback', optionalAuth, AuthController.githubCallback);
 
+router.post('/github/exchange', authenticate, AuthController.githubExchange);
+
 router.get('/github/status', authenticate, AuthController.getGithubStatus);
 
 router.delete('/github', authenticate, AuthController.disconnectGithub);
