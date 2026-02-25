@@ -19,8 +19,6 @@ router.post('/', authenticate, hasRole('ADMIN'), usersController.create);
 
 router.put('/:id', authenticate, hasRole('ADMIN'), usersController.update);
 
-
-
 router.put('/:id/password', authenticate, hasRole('ADMIN'), usersController.updatePassword);
 
 router.put('/:id/status', authenticate, hasRole('ADMIN'), usersController.toggleStatus);

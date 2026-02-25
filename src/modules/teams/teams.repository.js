@@ -80,7 +80,7 @@ export const findAll = async ({ search = null, page = 1, limit = 10 }) => {
     LEFT JOIN team_coders tc ON t.id_team = tc.id_team AND tc.team_role = 'LEADER'
     LEFT JOIN users u ON tc.id_user = u.id_user
     ${whereClause}
-    GROUP BY t.id_team, u.id_user, u.name, u.email
+    GROUP BY t.id_team, u.id_user, u.name, u.email, t.created_at
     ORDER BY t.created_at DESC
     LIMIT $${paramIndex++} OFFSET $${paramIndex++}
   `;
