@@ -127,26 +127,21 @@ export const githubCallback = asyncHandler(async (req, res) => {
     return res.redirect(redirectUrl);
   }
 
-  const state = req.query.state;
-  const query = new URLSearchParams();
-  query.set('code', code);
-  if (state) {
-    query.set('state', state);
+  const userId = req.user?.id_user;
+
+  if (!userId) {
+    const redirectUrl = `${config.client.url}/settings/github?error=not_authenticated`;
+    return res.redirect(redirectUrl);
   }
-  const redirectUrl = `${config.client.url}/settings/github?${query.toString()}`;
-  return res.redirect(redirectUrl);
-});
 
-export const githubExchange = asyncHandler(async (req, res) => {
-  const userId = req.user.id_user;
-  const { code, state } = req.body;
-
-  const result = await AuthService.handleGithubCallback(code, userId);
-
-  return success(res, {
-    ...result,
-    state,
-  });
+  try {
+    const result = await AuthService.handleGithubCallback(code, userId);
+    const redirectUrl = `${config.client.url}/settings/github?success=true&username=${encodeURIComponent(result.github.username)}`;
+    return res.redirect(redirectUrl);
+  } catch (err) {
+    const redirectUrl = `${config.client.url}/settings/github?error=${encodeURIComponent(err.message)}`;
+    return res.redirect(redirectUrl);
+  }
 });
 
 export const getGithubStatus = asyncHandler(async (req, res) => {
