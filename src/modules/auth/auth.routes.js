@@ -1,35 +1,36 @@
-import { Router } from 'express';
-import AuthController from './auth.controller.js';
-import { authenticate, optionalAuth } from '../../middleware/auth.js';
-import { hasRole } from '../../middleware/rbac.js';
+import { Router } from "express";
+import AuthController from "./auth.controller.js";
+import { authenticate, optionalAuth } from "../../middleware/auth.js";
+import { hasRole } from "../../middleware/rbac.js";
 
 const router = Router();
 
-router.get('/', (req, res) => {
-  res.json({ message: 'Auth API' });
+router.get("/", (req, res) => {
+  res.json({ message: "Auth API" });
 });
 
-router.post('/register', AuthController.register);
+router.post("/register", AuthController.register);
 
-router.post('/login', AuthController.login);
+router.post("/login", AuthController.login);
 
-router.post('/logout', AuthController.logout);
+router.post("/logout", AuthController.logout);
 
-router.post('/refresh', AuthController.refresh);
+router.post("/refresh", AuthController.refresh);
 
-router.get('/me', authenticate, AuthController.getMe);
+router.get("/me", authenticate, AuthController.getMe);
 
-router.put('/password', authenticate, AuthController.changePassword);
+router.put("/password", authenticate, AuthController.changePassword);
 
-router.put('/profile', authenticate, AuthController.updateProfile);
+router.put("/profile", authenticate, AuthController.updateProfile);
 
-router.get('/github', authenticate, AuthController.githubAuth);
-router.get('/github/url', authenticate, AuthController.githubAuthUrl);
+router.get("/github", authenticate, AuthController.githubAuth);
 
-router.get('/github/callback', optionalAuth, AuthController.githubCallback);
+router.get("/github/url", authenticate, AuthController.githubAuthUrl);
 
-router.get('/github/status', authenticate, AuthController.getGithubStatus);
+router.get("/github/callback", AuthController.githubCallback);
 
-router.delete('/github', authenticate, AuthController.disconnectGithub);
+router.get("/github/status", authenticate, AuthController.getGithubStatus);
+
+router.delete("/github", authenticate, AuthController.disconnectGithub);
 
 export default router;
