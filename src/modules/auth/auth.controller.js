@@ -172,11 +172,11 @@ export const githubCallback = asyncHandler(async (req, res) => {
   try {
     const result = await AuthService.handleGithubCallback(code, userId);
     return res.redirect(
-      `${config.client.url}/settings/github?success=true&username=${encodeURIComponent(result.github.username)}`,
+      `${config.client.url}/?github=success&username=${encodeURIComponent(result.github.username)}`,
     );
   } catch (err) {
     return res.redirect(
-      `${config.client.url}/settings/github?error=${encodeURIComponent(err.message)}`,
+      `${config.client.url}/?error=${encodeURIComponent(err.message)}`,
     );
   }
 });
