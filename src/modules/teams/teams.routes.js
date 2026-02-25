@@ -7,6 +7,13 @@ const router = Router();
 
 router.get("/", authenticate, TeamsController.list);
 
+router.post(
+  "/create",
+  authenticate,
+  hasRole("ADMIN", "TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH", "CODER"),
+  TeamsController.create,
+);
+
 router.get("/my-teams", authenticate, TeamsController.getMyTeams);
 
 router.get("/invitations", authenticate, TeamsController.getMyInvitations);
@@ -28,13 +35,6 @@ router.get(
   authenticate,
   hasRole("ADMIN", "TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH"),
   TeamsController.getAvailable,
-);
-
-router.post(
-  "/",
-  authenticate,
-  hasRole("ADMIN", "TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH", "CODER"),
-  TeamsController.create,
 );
 
 router.put("/:id", authenticate, TeamsController.update);
