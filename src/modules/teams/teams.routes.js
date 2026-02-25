@@ -5,12 +5,7 @@ import { hasRole, isAdminOrTeamLead } from "../../middleware/rbac.js";
 
 const router = Router();
 
-router.get(
-  "/",
-  authenticate,
-  hasRole("ADMIN", "TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH", "CODER"),
-  TeamsController.list,
-);
+router.get("/", authenticate, TeamsController.list);
 
 router.get("/my-teams", authenticate, TeamsController.getMyTeams);
 
