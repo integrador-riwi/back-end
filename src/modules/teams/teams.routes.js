@@ -31,7 +31,7 @@ router.get(
 );
 
 router.post(
-  "/create",
+  "/",
   authenticate,
   hasRole("ADMIN", "TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH", "CODER"),
   TeamsController.create,
