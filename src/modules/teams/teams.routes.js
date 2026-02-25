@@ -32,8 +32,8 @@ router.get(
 
 router.post(
   "/",
-  hasRole("ADMIN", "TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH", "CODER"),
   authenticate,
+  hasRole("ADMIN", "TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH", "CODER"),
   TeamsController.create,
 );
 
