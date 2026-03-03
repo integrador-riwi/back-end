@@ -294,6 +294,12 @@ export const removeMember = async (teamId, userId) => {
 
     const result = await client.query(deleteQuery, [teamId, userId]);
 
+    const deleteInvitationQuery = `
+      DELETE FROM team_invitations 
+      WHERE id_team = $1 AND id_user = $2
+    `;
+    await client.query(deleteInvitationQuery, [teamId, userId]);
+
     await client.query("COMMIT");
 
     return result.rows[0];
@@ -521,6 +527,8 @@ export const createInvitation = async (teamId, userId, invitedBy) => {
     const query = `
       INSERT INTO team_invitations (id_team, id_user, invited_by, status)
       VALUES ($1, $2, $3, 'PENDING')
+      ON CONFLICT (id_team, id_user)
+      DO UPDATE SET status = 'PENDING', invited_by = $3, updated_at = NOW()
       RETURNING id_invitation, id_team, id_user, status, invited_by, created_at
     `;
 
