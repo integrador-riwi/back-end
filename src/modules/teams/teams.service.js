@@ -304,6 +304,18 @@ export const removeMemberFromTeam = async (
   }
 
   const memberWithGithub = await TeamsRepository.getMemberWithGithub(memberId);
+  const memberIsLeader = await TeamsRepository.isLeader(teamId, memberId);
+  const memberCount = await TeamsRepository.countTeamMembers(teamId);
+
+  // Si el lider se va y el equipo esta vacio (solo el), eliminar el equipo
+  if (memberIsLeader && memberCount <= 1) {
+    await TeamsRepository.remove(teamId);
+    return {
+      deleted: true,
+      message: "Equipo eliminado porque el lider salio y no habia mas miembros",
+    };
+  }
+
   const member = await TeamsRepository.removeMember(teamId, memberId);
 
   try {
