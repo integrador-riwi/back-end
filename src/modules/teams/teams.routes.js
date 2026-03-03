@@ -26,7 +26,7 @@ router.get(
 router.get(
   "/:id/available",
   authenticate,
-  hasRole("ADMIN", "TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH"),
+  hasRole("ADMIN", "TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH", "CODER"),
   TeamsController.getAvailable,
 );
 
