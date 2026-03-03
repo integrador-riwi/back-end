@@ -77,11 +77,19 @@ export const createTeam = async (
     let repoUrl = null;
     let savedRepoName = repoName;
 
-    if (n8nResponse && n8nResponse.data) {
-      repoUrl =
-        n8nResponse.data.repositoryUrl || n8nResponse.data.repository_url;
-      savedRepoName = n8nResponse.data.repositoryName || repoName;
+    // n8n responde: { status, message, data: { repositoryUrl, repositoryName } }
+    // axios wrappea eso en response.data -> n8nResponse.data.data es el objeto real
+    const n8nData = n8nResponse?.data?.data ?? n8nResponse?.data ?? null;
+    if (n8nData) {
+      repoUrl = n8nData.repositoryUrl || n8nData.repository_url || null;
+      savedRepoName = n8nData.repositoryName || repoName;
     }
+    console.log(
+      "[n8n team-created] savedRepoName:",
+      savedRepoName,
+      "repoUrl:",
+      repoUrl,
+    );
 
     // Guardar el repo en team_projects para que invite/remove funcionen
     await TeamsRepository.saveTeamProject(team.id_team, {
