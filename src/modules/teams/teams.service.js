@@ -63,11 +63,20 @@ export const createTeam = async (
     );
 
     let repoUrl = null;
+    let savedRepoName = repoName;
 
     if (n8nResponse && n8nResponse.data) {
       repoUrl =
         n8nResponse.data.repositoryUrl || n8nResponse.data.repository_url;
+      savedRepoName = n8nResponse.data.repositoryName || repoName;
     }
+
+    // Guardar el repo en team_projects para que invite/remove funcionen
+    await TeamsRepository.saveTeamProject(team.id_team, {
+      repoName: savedRepoName,
+      repoUrl: repoUrl,
+      inviteToken: null,
+    });
 
     return {
       ...team,
