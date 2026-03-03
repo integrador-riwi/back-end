@@ -727,4 +727,5 @@ export default {
   getMemberWithGithub,
   countTeamMembers,
   getTeamProject,
+  saveTeamProject,
 };
