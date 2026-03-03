@@ -232,7 +232,19 @@ export const addMemberToTeam = async (teamId, memberData, userId, userRole) => {
     const leaderWithGithub = await TeamsRepository.getLeaderWithGithub(teamId);
     const teamProject = await TeamsRepository.getTeamProject(teamId);
 
+    console.log("[n8n] leaderWithGithub:", JSON.stringify(leaderWithGithub));
+    console.log("[n8n] teamProject:", JSON.stringify(teamProject));
+    console.log(
+      "[n8n] memberWithGithub:",
+      JSON.stringify({
+        githubUsername: memberWithGithub.github_username,
+        email: memberWithGithub.email,
+        name: memberWithGithub.name,
+      }),
+    );
+
     if (leaderWithGithub && teamProject) {
+      console.log("[n8n] Firing triggerMemberInvited...");
       await n8nService.triggerMemberInvited(
         {
           id: teamId,
@@ -248,9 +260,18 @@ export const addMemberToTeam = async (teamId, memberData, userId, userRole) => {
           role: memberData.role || "DEVELOPER",
         },
       );
+      console.log("[n8n] triggerMemberInvited OK");
+    } else {
+      console.warn(
+        "[n8n] Skipped: leaderWithGithub=",
+        leaderWithGithub,
+        "teamProject=",
+        teamProject,
+      );
     }
   } catch (error) {
-    console.error("Error triggering n8n member invited:", error.message);
+    console.error("[n8n] Error triggering member invited:", error.message);
+    console.error("[n8n] Full error:", error);
   }
 
   return {
@@ -421,7 +442,35 @@ export const acceptInvitation = async (invitationId, userId) => {
     );
   }
 
-  return TeamsRepository.acceptInvitation(invitationId, userId);
+  const result = await TeamsRepository.acceptInvitation(invitationId, userId);
+
+  try {
+    const teamId = invitation.id_team;
+    const leaderWithGithub = await TeamsRepository.getLeaderWithGithub(teamId);
+    const teamProject = await TeamsRepository.getTeamProject(teamId);
+
+    if (leaderWithGithub && teamProject?.repo_name) {
+      await n8nService.triggerMemberInvited(
+        {
+          id: teamId,
+          projectId: teamId,
+          repoName: teamProject.repo_name,
+          leaderGithubUsername: leaderWithGithub.github_username,
+        },
+        {
+          githubUsername: memberWithGithub.github_username,
+          githubToken: memberWithGithub.github_token,
+          email: memberWithGithub.email,
+          name: memberWithGithub.name,
+          role: "DEVELOPER",
+        },
+      );
+    }
+  } catch (error) {
+    console.error("Error triggering n8n on accept invitation:", error.message);
+  }
+
+  return result;
 };
 
 export const rejectInvitation = async (invitationId, userId) => {
