@@ -43,6 +43,18 @@ export const createTeam = async (
     );
   }
 
+  // Idempotencia: si ya es líder de un equipo, devolver ese en vez de crear otro
+  const existingTeam = await TeamsRepository.findLeaderTeam(leaderId);
+  if (existingTeam) {
+    const project = await TeamsRepository.getTeamProject(existingTeam.id_team);
+    return {
+      ...existingTeam,
+      leader_id: leaderId,
+      members: [],
+      repo_url: project?.repo_url ?? null,
+    };
+  }
+
   const team = await TeamsRepository.create({
     name: data.name.trim(),
     leaderId,
@@ -71,6 +83,7 @@ export const createTeam = async (
       savedRepoName = n8nResponse.data.repositoryName || repoName;
     }
 
+    // Guardar el repo en team_projects para que invite/remove funcionen
     await TeamsRepository.saveTeamProject(team.id_team, {
       repoName: savedRepoName,
       repoUrl: repoUrl,
@@ -230,17 +243,62 @@ export const addMemberToTeam = async (teamId, memberData, userId, userRole) => {
     );
   }
 
-  // Solo crea la invitacion en la BD — n8n se dispara cuando el miembro la acepta
   const invitation = await TeamsRepository.createInvitation(
     teamId,
     memberData.userId,
     userId,
   );
 
+  try {
+    const leaderWithGithub = await TeamsRepository.getLeaderWithGithub(teamId);
+    const teamProject = await TeamsRepository.getTeamProject(teamId);
+
+    console.log("[n8n] leaderWithGithub:", JSON.stringify(leaderWithGithub));
+    console.log("[n8n] teamProject:", JSON.stringify(teamProject));
+    console.log(
+      "[n8n] memberWithGithub:",
+      JSON.stringify({
+        githubUsername: memberWithGithub.github_username,
+        email: memberWithGithub.email,
+        name: memberWithGithub.name,
+      }),
+    );
+
+    if (leaderWithGithub && teamProject) {
+      console.log("[n8n] Firing triggerMemberInvited...");
+      await n8nService.triggerMemberInvited(
+        {
+          id: teamId,
+          projectId: teamId,
+          repoName: teamProject.repo_name,
+          leaderGithubUsername: leaderWithGithub.github_username,
+        },
+        {
+          githubUsername: memberWithGithub.github_username,
+          githubToken: memberWithGithub.github_token,
+          email: memberWithGithub.email,
+          name: memberWithGithub.name,
+          role: memberData.role || "DEVELOPER",
+        },
+      );
+      console.log("[n8n] triggerMemberInvited OK");
+    } else {
+      console.warn(
+        "[n8n] Skipped: leaderWithGithub=",
+        leaderWithGithub,
+        "teamProject=",
+        teamProject,
+      );
+    }
+  } catch (error) {
+    console.error("[n8n] Error triggering member invited:", error.message);
+    console.error("[n8n] Full error:", error);
+  }
+
   return {
     ...invitation,
     message:
-      "Invitación enviada. El usuario debe aceptar la invitación en la plataforma.",
+      "Invitación enviada. El usuario debe aceptar la invitación en GitHub y luego en la plataforma.",
   };
 };
 
@@ -419,15 +477,12 @@ export const acceptInvitation = async (invitationId, userId) => {
 
   const result = await TeamsRepository.acceptInvitation(invitationId, userId);
 
-  // Disparar n8n SOLO aqui: cuando el miembro acepta es cuando realmente
-  // debe darse el acceso al repo de GitHub
   try {
     const teamId = invitation.id_team;
     const leaderWithGithub = await TeamsRepository.getLeaderWithGithub(teamId);
     const teamProject = await TeamsRepository.getTeamProject(teamId);
 
     if (leaderWithGithub && teamProject?.repo_name) {
-      console.log("[n8n] Firing triggerMemberInvited on acceptInvitation...");
       await n8nService.triggerMemberInvited(
         {
           id: teamId,
@@ -443,17 +498,9 @@ export const acceptInvitation = async (invitationId, userId) => {
           role: "DEVELOPER",
         },
       );
-      console.log("[n8n] triggerMemberInvited OK");
-    } else {
-      console.warn(
-        "[n8n] Skipped: leaderWithGithub=",
-        leaderWithGithub,
-        "teamProject=",
-        teamProject,
-      );
     }
   } catch (error) {
-    console.error("[n8n] Error triggering member invited:", error.message);
+    console.error("Error triggering n8n on accept invitation:", error.message);
   }
 
   return result;

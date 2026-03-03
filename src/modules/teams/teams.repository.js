@@ -704,6 +704,18 @@ export const rejectInvitation = async (invitationId, userId) => {
   }
 };
 
+export const findLeaderTeam = async (userId) => {
+  const query = `
+    SELECT t.id_team, t.name, t.created_at
+    FROM teams t
+    JOIN team_coders tc ON t.id_team = tc.id_team
+    WHERE tc.id_user = $1 AND tc.team_role = 'LEADER'
+    LIMIT 1
+  `;
+  const result = await pool.query(query, [userId]);
+  return result.rows[0] || null;
+};
+
 export default {
   create,
   findAll,
@@ -728,4 +740,5 @@ export default {
   countTeamMembers,
   getTeamProject,
   saveTeamProject,
+  findLeaderTeam,
 };
