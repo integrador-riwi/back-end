@@ -49,6 +49,8 @@ router.delete(
   TeamsController.removeMember,
 );
 
+router.delete("/:id/leave", authenticate, TeamsController.leaveTeam);
+
 router.post(
   "/invitations/:id/accept",
   authenticate,

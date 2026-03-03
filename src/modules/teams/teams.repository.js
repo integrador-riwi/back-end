@@ -1,11 +1,15 @@
-import pool from '../../db/pool.js';
-import { NotFoundError, ConflictError, DatabaseError } from '../../middleware/errorHandler.js';
+import pool from "../../db/pool.js";
+import {
+  NotFoundError,
+  ConflictError,
+  DatabaseError,
+} from "../../middleware/errorHandler.js";
 
 export const create = async ({ name, leaderId }) => {
   const client = await pool.connect();
 
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
     const teamQuery = `
       INSERT INTO teams (name)
@@ -24,18 +28,18 @@ export const create = async ({ name, leaderId }) => {
 
     await client.query(memberQuery, [team.id_team, leaderId]);
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
 
     return {
       ...team,
       leader_id: leaderId,
-      members: []
+      members: [],
     };
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
 
-    if (error.code === '23505') {
-      throw new ConflictError('Ya existe un equipo con este nombre');
+    if (error.code === "23505") {
+      throw new ConflictError("Ya existe un equipo con este nombre");
     }
     throw new DatabaseError(`Error al crear equipo: ${error.message}`);
   } finally {
@@ -53,9 +57,8 @@ export const findAll = async ({ search = null, page = 1, limit = 10 }) => {
     params.push(`%${search}%`);
   }
 
-  const whereClause = whereClauses.length > 0
-    ? `WHERE ${whereClauses.join(' AND ')}`
-    : '';
+  const whereClause =
+    whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
   const offset = (page - 1) * limit;
 
@@ -94,8 +97,8 @@ export const findAll = async ({ search = null, page = 1, limit = 10 }) => {
       page,
       limit,
       total,
-      totalPages: Math.ceil(total / limit)
-    }
+      totalPages: Math.ceil(total / limit),
+    },
   };
 };
 
@@ -162,7 +165,7 @@ export const findByIdWithMembers = async (id) => {
 
   return {
     ...team,
-    members: membersResult.rows
+    members: membersResult.rows,
   };
 };
 
@@ -182,55 +185,61 @@ export const remove = async (id) => {
   const client = await pool.connect();
 
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
-    await client.query('DELETE FROM team_coders WHERE id_team = $1', [id]);
-    await client.query('DELETE FROM projects WHERE team_id = $1', [id]);
-    
-    const result = await client.query('DELETE FROM teams WHERE id_team = $1 RETURNING id_team', [id]);
+    await client.query("DELETE FROM team_coders WHERE id_team = $1", [id]);
+    await client.query("DELETE FROM projects WHERE team_id = $1", [id]);
 
-    await client.query('COMMIT');
+    const result = await client.query(
+      "DELETE FROM teams WHERE id_team = $1 RETURNING id_team",
+      [id],
+    );
+
+    await client.query("COMMIT");
 
     return result.rows[0] || null;
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     throw new DatabaseError(`Error al eliminar equipo: ${error.message}`);
   } finally {
     client.release();
   }
 };
 
-export const addMember = async (teamId, userId, teamRole = 'DEVELOPER') => {
+export const addMember = async (teamId, userId, teamRole = "DEVELOPER") => {
   const client = await pool.connect();
 
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
-    const checkTeamQuery = 'SELECT id_team FROM teams WHERE id_team = $1';
+    const checkTeamQuery = "SELECT id_team FROM teams WHERE id_team = $1";
     const teamResult = await client.query(checkTeamQuery, [teamId]);
-    
+
     if (teamResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      throw new NotFoundError('Equipo no encontrado');
+      await client.query("ROLLBACK");
+      throw new NotFoundError("Equipo no encontrado");
     }
 
-    const checkUserQuery = 'SELECT id_user FROM users WHERE id_user = $1';
+    const checkUserQuery = "SELECT id_user FROM users WHERE id_user = $1";
     const userResult = await client.query(checkUserQuery, [userId]);
-    
+
     if (userResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      throw new NotFoundError('Usuario no encontrado');
+      await client.query("ROLLBACK");
+      throw new NotFoundError("Usuario no encontrado");
     }
 
     const checkMembershipQuery = `
       SELECT id_team FROM team_coders 
       WHERE id_team = $1 AND id_user = $2
     `;
-    const membershipResult = await client.query(checkMembershipQuery, [teamId, userId]);
-    
+    const membershipResult = await client.query(checkMembershipQuery, [
+      teamId,
+      userId,
+    ]);
+
     if (membershipResult.rows.length > 0) {
-      await client.query('ROLLBACK');
-      throw new ConflictError('El usuario ya es miembro del equipo');
+      await client.query("ROLLBACK");
+      throw new ConflictError("El usuario ya es miembro del equipo");
     }
 
     const insertQuery = `
@@ -241,11 +250,11 @@ export const addMember = async (teamId, userId, teamRole = 'DEVELOPER') => {
 
     const result = await client.query(insertQuery, [teamId, userId, teamRole]);
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
 
     return result.rows[0];
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     if (error instanceof NotFoundError || error instanceof ConflictError) {
       throw error;
     }
@@ -259,7 +268,7 @@ export const removeMember = async (teamId, userId) => {
   const client = await pool.connect();
 
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
     const checkQuery = `
       SELECT team_role FROM team_coders 
@@ -268,13 +277,13 @@ export const removeMember = async (teamId, userId) => {
     const checkResult = await client.query(checkQuery, [teamId, userId]);
 
     if (checkResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      throw new NotFoundError('El usuario no es miembro del equipo');
+      await client.query("ROLLBACK");
+      throw new NotFoundError("El usuario no es miembro del equipo");
     }
 
-    if (checkResult.rows[0].team_role === 'LEADER') {
-      await client.query('ROLLBACK');
-      throw new ConflictError('No puedes eliminar al líder del equipo');
+    if (checkResult.rows[0].team_role === "LEADER") {
+      await client.query("ROLLBACK");
+      throw new ConflictError("No puedes eliminar al líder del equipo");
     }
 
     const deleteQuery = `
@@ -285,11 +294,11 @@ export const removeMember = async (teamId, userId) => {
 
     const result = await client.query(deleteQuery, [teamId, userId]);
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
 
     return result.rows[0];
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     if (error instanceof NotFoundError || error instanceof ConflictError) {
       throw error;
     }
@@ -346,9 +355,12 @@ export const isLeader = async (teamId, userId) => {
   return result.rows.length > 0;
 };
 
-export const getAvailableCoders = async (teamId, { search = null, page = 1, limit = 20 }) => {
-  let whereClauses = ['u.role = $1', 'u.is_active = true'];
-  let params = ['CODER'];
+export const getAvailableCoders = async (
+  teamId,
+  { search = null, page = 1, limit = 20 },
+) => {
+  let whereClauses = ["u.role = $1", "u.is_active = true"];
+  let params = ["CODER"];
   let paramIndex = 2;
 
   const notInTeamSubquery = `
@@ -360,7 +372,9 @@ export const getAvailableCoders = async (teamId, { search = null, page = 1, limi
   whereClauses.push(notInTeamSubquery);
 
   if (search) {
-    whereClauses.push(`(u.name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})`);
+    whereClauses.push(
+      `(u.name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})`,
+    );
     params.push(`%${search}%`);
     paramIndex++;
   }
@@ -370,7 +384,7 @@ export const getAvailableCoders = async (teamId, { search = null, page = 1, limi
   const countQuery = `
     SELECT COUNT(*) as total 
     FROM users u 
-    WHERE ${whereClauses.join(' AND ')}
+    WHERE ${whereClauses.join(" AND ")}
   `;
   const countResult = await pool.query(countQuery, params);
   const total = parseInt(countResult.rows[0].total, 10);
@@ -385,7 +399,7 @@ export const getAvailableCoders = async (teamId, { search = null, page = 1, limi
       p.description as profile_description
     FROM users u
     LEFT JOIN profiles p ON u.id_user = p.user_id
-    WHERE ${whereClauses.join(' AND ')}
+    WHERE ${whereClauses.join(" AND ")}
     ORDER BY u.name ASC
     LIMIT $${paramIndex++} OFFSET $${paramIndex++}
   `;
@@ -399,8 +413,8 @@ export const getAvailableCoders = async (teamId, { search = null, page = 1, limi
       page,
       limit,
       total,
-      totalPages: Math.ceil(total / limit)
-    }
+      totalPages: Math.ceil(total / limit),
+    },
   };
 };
 
@@ -436,7 +450,7 @@ export const getMemberWithGithub = async (userId) => {
 };
 
 export const countTeamMembers = async (teamId) => {
-  const query = 'SELECT COUNT(*) as total FROM team_coders WHERE id_team = $1';
+  const query = "SELECT COUNT(*) as total FROM team_coders WHERE id_team = $1";
   const result = await pool.query(query, [teamId]);
   return parseInt(result.rows[0].total, 10);
 };
@@ -451,7 +465,10 @@ export const getTeamProject = async (teamId) => {
   return result.rows[0] || null;
 };
 
-export const saveTeamProject = async (teamId, { repoName, repoUrl, inviteToken }) => {
+export const saveTeamProject = async (
+  teamId,
+  { repoName, repoUrl, inviteToken },
+) => {
   const query = `
     INSERT INTO team_projects (id_team, repo_name, repo_url, github_invite_token)
     VALUES ($1, $2, $3, $4)
@@ -459,7 +476,12 @@ export const saveTeamProject = async (teamId, { repoName, repoUrl, inviteToken }
     DO UPDATE SET repo_name = $2, repo_url = $3, github_invite_token = $4, updated_at = NOW()
     RETURNING id_project, id_team, repo_name, repo_url
   `;
-  const result = await pool.query(query, [teamId, repoName, repoUrl, inviteToken]);
+  const result = await pool.query(query, [
+    teamId,
+    repoName,
+    repoUrl,
+    inviteToken,
+  ]);
   return result.rows[0];
 };
 
@@ -467,17 +489,22 @@ export const createInvitation = async (teamId, userId, invitedBy) => {
   const client = await pool.connect();
 
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
     const checkExistingQuery = `
       SELECT id_invitation FROM team_invitations 
       WHERE id_team = $1 AND id_user = $2 AND status = 'PENDING'
     `;
-    const existingResult = await client.query(checkExistingQuery, [teamId, userId]);
+    const existingResult = await client.query(checkExistingQuery, [
+      teamId,
+      userId,
+    ]);
 
     if (existingResult.rows.length > 0) {
-      await client.query('ROLLBACK');
-      throw new ConflictError('Ya existe una invitación pendiente para este usuario');
+      await client.query("ROLLBACK");
+      throw new ConflictError(
+        "Ya existe una invitación pendiente para este usuario",
+      );
     }
 
     const checkMemberQuery = `
@@ -487,8 +514,8 @@ export const createInvitation = async (teamId, userId, invitedBy) => {
     const memberResult = await client.query(checkMemberQuery, [teamId, userId]);
 
     if (memberResult.rows.length > 0) {
-      await client.query('ROLLBACK');
-      throw new ConflictError('El usuario ya es miembro del equipo');
+      await client.query("ROLLBACK");
+      throw new ConflictError("El usuario ya es miembro del equipo");
     }
 
     const query = `
@@ -499,11 +526,11 @@ export const createInvitation = async (teamId, userId, invitedBy) => {
 
     const result = await client.query(query, [teamId, userId, invitedBy]);
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
 
     return result.rows[0];
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     if (error instanceof ConflictError) {
       throw error;
     }
@@ -582,17 +609,20 @@ export const acceptInvitation = async (invitationId, userId) => {
   const client = await pool.connect();
 
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
     const invitationQuery = `
       SELECT * FROM team_invitations 
       WHERE id_invitation = $1 AND id_user = $2 AND status = 'PENDING'
     `;
-    const invitationResult = await client.query(invitationQuery, [invitationId, userId]);
+    const invitationResult = await client.query(invitationQuery, [
+      invitationId,
+      userId,
+    ]);
 
     if (invitationResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      throw new NotFoundError('Invitación no encontrada o ya procesada');
+      await client.query("ROLLBACK");
+      throw new NotFoundError("Invitación no encontrada o ya procesada");
     }
 
     const invitation = invitationResult.rows[0];
@@ -611,11 +641,11 @@ export const acceptInvitation = async (invitationId, userId) => {
     `;
     await client.query(updateQuery, [invitationId]);
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
 
     return { id_team: invitation.id_team, id_user: userId };
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     if (error instanceof NotFoundError) {
       throw error;
     }
@@ -629,17 +659,20 @@ export const rejectInvitation = async (invitationId, userId) => {
   const client = await pool.connect();
 
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
     const invitationQuery = `
       SELECT * FROM team_invitations 
       WHERE id_invitation = $1 AND id_user = $2 AND status = 'PENDING'
     `;
-    const invitationResult = await client.query(invitationQuery, [invitationId, userId]);
+    const invitationResult = await client.query(invitationQuery, [
+      invitationId,
+      userId,
+    ]);
 
     if (invitationResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      throw new NotFoundError('Invitación no encontrada o ya procesada');
+      await client.query("ROLLBACK");
+      throw new NotFoundError("Invitación no encontrada o ya procesada");
     }
 
     const updateQuery = `
@@ -649,11 +682,11 @@ export const rejectInvitation = async (invitationId, userId) => {
     `;
     await client.query(updateQuery, [invitationId]);
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
 
-    return { id_invitation: invitationId, status: 'REJECTED' };
+    return { id_invitation: invitationId, status: "REJECTED" };
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     if (error instanceof NotFoundError) {
       throw error;
     }
@@ -685,5 +718,5 @@ export default {
   getLeaderWithGithub,
   getMemberWithGithub,
   countTeamMembers,
-  getTeamProject
+  getTeamProject,
 };

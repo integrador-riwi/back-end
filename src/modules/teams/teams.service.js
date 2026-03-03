@@ -274,14 +274,37 @@ export const removeMemberFromTeam = async (
 
   const isLeader = await TeamsRepository.isLeader(teamId, userId);
   const isAdmin = userRole === "ADMIN";
+  const isSelf = memberId === userId;
 
-  if (!isLeader && !isAdmin) {
+  if (!isLeader && !isAdmin && !isSelf) {
     throw new ForbiddenError(
       "No tienes permiso para eliminar miembros de este equipo",
     );
   }
 
+  const memberWithGithub = await TeamsRepository.getMemberWithGithub(memberId);
   const member = await TeamsRepository.removeMember(teamId, memberId);
+
+  try {
+    const leaderWithGithub = await TeamsRepository.getLeaderWithGithub(teamId);
+    const teamProject = await TeamsRepository.getTeamProject(teamId);
+
+    if (memberWithGithub && leaderWithGithub && teamProject) {
+      await n8nService.triggerMemberRemoved(
+        {
+          repoName: teamProject.repo_name,
+          leaderGithubUsername: leaderWithGithub.github_username,
+        },
+        {
+          githubUsername: memberWithGithub.github_username,
+          email: memberWithGithub.email,
+          name: memberWithGithub.name,
+        },
+      );
+    }
+  } catch (error) {
+    console.error("Error triggering n8n member removed:", error.message);
+  }
 
   return member;
 };

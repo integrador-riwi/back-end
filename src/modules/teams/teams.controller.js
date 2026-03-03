@@ -1,8 +1,8 @@
-import TeamsService from './teams.service.js';
-import { success, created } from '../../utils/response.js';
-import { asyncHandler } from '../../middleware/errorHandler.js';
+import TeamsService from "./teams.service.js";
+import { success, created } from "../../utils/response.js";
+import { asyncHandler } from "../../middleware/errorHandler.js";
 // Google AI Search By Description
-import { searchProjectByDescription } from '../../integrations/Google AI/searchService.js'
+import { searchProjectByDescription } from "../../integrations/Google AI/searchService.js";
 
 export const create = asyncHandler(async (req, res) => {
   const { name } = req.body;
@@ -57,7 +57,7 @@ export const remove = asyncHandler(async (req, res) => {
 
   await TeamsService.deleteTeam(id, userRole);
 
-  return success(res, { message: 'Equipo eliminado correctamente' });
+  return success(res, { message: "Equipo eliminado correctamente" });
 });
 
 export const addMember = asyncHandler(async (req, res) => {
@@ -70,7 +70,7 @@ export const addMember = asyncHandler(async (req, res) => {
     id,
     { userId, role },
     userIdCurrent,
-    userRole
+    userRole,
   );
 
   return success(res, member);
@@ -81,9 +81,14 @@ export const removeMember = asyncHandler(async (req, res) => {
   const userIdCurrent = req.user.id_user;
   const userRole = req.user.role;
 
-  await TeamsService.removeMemberFromTeam(id, parseInt(userId), userIdCurrent, userRole);
+  await TeamsService.removeMemberFromTeam(
+    id,
+    parseInt(userId),
+    userIdCurrent,
+    userRole,
+  );
 
-  return success(res, { message: 'Miembro eliminado del equipo' });
+  return success(res, { message: "Miembro eliminado del equipo" });
 });
 
 export const getMembers = asyncHandler(async (req, res) => {
@@ -108,7 +113,11 @@ export const getAvailable = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { search, page, limit } = req.query;
 
-  const result = await TeamsService.getAvailableCoders(id, { search, page, limit });
+  const result = await TeamsService.getAvailableCoders(id, {
+    search,
+    page,
+    limit,
+  });
 
   return success(res, result);
 });
@@ -118,7 +127,11 @@ export const getTeamInvitations = asyncHandler(async (req, res) => {
   const userId = req.user.id_user;
   const userRole = req.user.role;
 
-  const invitations = await TeamsService.getTeamInvitations(id, userId, userRole);
+  const invitations = await TeamsService.getTeamInvitations(
+    id,
+    userId,
+    userRole,
+  );
 
   return success(res, invitations);
 });
@@ -137,7 +150,10 @@ export const acceptInvitation = asyncHandler(async (req, res) => {
 
   const result = await TeamsService.acceptInvitation(parseInt(id), userId);
 
-  return success(res, { message: 'Te has unido al equipo correctamente', ...result });
+  return success(res, {
+    message: "Te has unido al equipo correctamente",
+    ...result,
+  });
 });
 
 export const rejectInvitation = asyncHandler(async (req, res) => {
@@ -146,33 +162,43 @@ export const rejectInvitation = asyncHandler(async (req, res) => {
 
   const result = await TeamsService.rejectInvitation(parseInt(id), userId);
 
-  return success(res, { message: 'Invitación rechazada', ...result });
+  return success(res, { message: "Invitación rechazada", ...result });
+});
+
+export const leaveTeam = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id_user;
+  const userRole = req.user.role;
+
+  await TeamsService.removeMemberFromTeam(id, userId, userId, userRole);
+
+  return success(res, { message: "Has salido del equipo correctamente" });
 });
 
 // AI ChatGPT Search by Description
 export const searchProjects = asyncHandler(async (req, res) => {
-  const { q, limit, min_similarity, exclude_project } = req.query
+  const { q, limit, min_similarity, exclude_project } = req.query;
 
-  if (!q || q.trim() === '') {
+  if (!q || q.trim() === "") {
     return res.status(400).json({
       success: false,
-      message: 'El parámetro de búsqueda "q" es requerido'
-    })
+      message: 'El parámetro de búsqueda "q" es requerido',
+    });
   }
 
   const results = await searchProjectByDescription(
-      q.trim(),
-      limit ? parseInt(limit) : 5,
-      min_similarity ? parseFloat(min_similarity) : 0.1,
-      exclude_project ? parseInt(exclude_project) : null
-  )
+    q.trim(),
+    limit ? parseInt(limit) : 5,
+    min_similarity ? parseFloat(min_similarity) : 0.1,
+    exclude_project ? parseInt(exclude_project) : null,
+  );
 
   return success(res, {
     query: q,
     total: results.length,
-    data: results
-  })
-})
+    data: results,
+  });
+});
 
 export default {
   create,
@@ -190,5 +216,6 @@ export default {
   getMyInvitations,
   acceptInvitation,
   rejectInvitation,
-  searchProjects
+  leaveTeam,
+  searchProjects,
 };

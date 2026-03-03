@@ -41,6 +41,21 @@ const n8nService = {
 
     return response.data;
   },
+
+  triggerMemberRemoved: async (teamData, member) => {
+    const response = await axios.post(
+      `${config.n8n.webhookUrl}/team-member-removed`,
+      {
+        repoName: teamData.repoName,
+        leaderUsername: teamData.leaderGithubUsername,
+        memberUsername: member.githubUsername,
+        memberEmail: member.email,
+        memberName: member.name,
+      },
+    );
+
+    return response.data;
+  },
 };
 
 export default n8nService;
