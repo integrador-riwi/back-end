@@ -612,6 +612,41 @@ export const acceptJoinRequest = async (requestId, userId, userRole) => {
   }
 
   const result = await TeamsRepository.acceptJoinRequest(requestId);
+
+  // Trigger n8n to add the member to the GitHub repo (same as acceptInvitation)
+  try {
+    const teamId = request.id_team;
+    const memberWithGithub = await TeamsRepository.getMemberWithGithub(
+      request.id_user,
+    );
+    const leaderWithGithub = await TeamsRepository.getLeaderWithGithub(teamId);
+    const teamProject = await TeamsRepository.getTeamProject(teamId);
+
+    if (
+      memberWithGithub?.github_username &&
+      leaderWithGithub &&
+      teamProject?.repo_name
+    ) {
+      await n8nService.triggerMemberInvited(
+        {
+          id: teamId,
+          projectId: teamId,
+          repoName: teamProject.repo_name,
+          leaderGithubUsername: leaderWithGithub.github_username,
+        },
+        {
+          githubUsername: memberWithGithub.github_username,
+          githubToken: memberWithGithub.github_token,
+          email: memberWithGithub.email,
+          name: memberWithGithub.name,
+          role: "DEVELOPER",
+        },
+      );
+    }
+  } catch (error) {
+    console.error("Error triggering n8n on acceptJoinRequest:", error.message);
+  }
+
   return result;
 };
 
