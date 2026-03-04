@@ -147,6 +147,7 @@ export const findByIdWithMembers = async (id) => {
       u.name,
       u.email,
       u.clan,
+      u.github_avatar_url,
       tc.team_role,
       p.github_url
     FROM team_coders tc
