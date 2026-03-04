@@ -107,7 +107,9 @@ export const createTeam = async (
 
     // Actualizar el proyecto con el repo_url
     if (repoUrl) {
-      project = await ProjectsRepository.update(project.id_project, { repoUrl });
+      project = await ProjectsRepository.update(project.id_project, {
+        repoUrl,
+      });
     }
 
     return {
@@ -551,6 +553,11 @@ export const requestToJoinTeam = async (teamId, userId) => {
     throw new NotFoundError("Equipo no encontrado");
   }
 
+  const alreadyInTeam = await TeamsRepository.isInAnyTeam(userId);
+  if (alreadyInTeam) {
+    throw new ValidationError("Ya perteneces a un equipo");
+  }
+
   const userWithGithub = await TeamsRepository.getMemberWithGithub(userId);
   if (!userWithGithub || !userWithGithub.github_username) {
     throw new ValidationError(
@@ -576,7 +583,12 @@ export const getTeamJoinRequests = async (teamId, userId, userRole) => {
     throw new ForbiddenError("No tienes permiso para ver las solicitudes");
   }
 
-  return TeamsRepository.getJoinRequestsByTeam(teamId);
+  const all = await TeamsRepository.getJoinRequestsByTeam(teamId);
+  return all.filter((r) => r.status === "PENDING");
+};
+
+export const cancelJoinRequest = async (requestId, userId) => {
+  return TeamsRepository.cancelJoinRequest(requestId, userId);
 };
 
 export const getMyPendingJoinRequests = async (userId) => {
@@ -589,7 +601,10 @@ export const acceptJoinRequest = async (requestId, userId, userRole) => {
     throw new NotFoundError("Solicitud no encontrada");
   }
 
-  const isLeaderOrAdmin = await TeamsRepository.isLeader(request.id_team, userId);
+  const isLeaderOrAdmin = await TeamsRepository.isLeader(
+    request.id_team,
+    userId,
+  );
   const isAdmin = userRole === "ADMIN";
 
   if (!isLeaderOrAdmin && !isAdmin) {
@@ -606,7 +621,10 @@ export const rejectJoinRequest = async (requestId, userId, userRole) => {
     throw new NotFoundError("Solicitud no encontrada");
   }
 
-  const isLeaderOrAdmin = await TeamsRepository.isLeader(request.id_team, userId);
+  const isLeaderOrAdmin = await TeamsRepository.isLeader(
+    request.id_team,
+    userId,
+  );
   const isAdmin = userRole === "ADMIN";
 
   if (!isLeaderOrAdmin && !isAdmin) {
@@ -637,4 +655,5 @@ export default {
   getMyPendingJoinRequests,
   acceptJoinRequest,
   rejectJoinRequest,
+  cancelJoinRequest,
 };
