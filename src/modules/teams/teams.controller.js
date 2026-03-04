@@ -9,7 +9,11 @@ export const create = asyncHandler(async (req, res) => {
   const userId = req.user.id_user;
   const userRole = req.user.role;
 
-  const team = await TeamsService.createTeam({ name, description }, userId, userRole);
+  const team = await TeamsService.createTeam(
+    { name, description },
+    userId,
+    userRole,
+  );
 
   return created(res, team);
 });
@@ -105,7 +109,8 @@ export const getMyTeams = asyncHandler(async (req, res) => {
   const userId = req.user.id_user;
 
   const teams = await TeamsService.getMyTeams(userId);
-  const pendingJoinRequests = await TeamsService.getMyPendingJoinRequests(userId);
+  const pendingJoinRequests =
+    await TeamsService.getMyPendingJoinRequests(userId);
 
   return success(res, { ...teams, pendingJoinRequests });
 });
@@ -215,7 +220,11 @@ export const acceptJoinRequest = asyncHandler(async (req, res) => {
   const userId = req.user.id_user;
   const userRole = req.user.role;
 
-  const result = await TeamsService.acceptJoinRequest(parseInt(id), userId, userRole);
+  const result = await TeamsService.acceptJoinRequest(
+    parseInt(id),
+    userId,
+    userRole,
+  );
 
   return success(res, {
     message: "Solicitud aceptada correctamente",
@@ -228,10 +237,26 @@ export const rejectJoinRequest = asyncHandler(async (req, res) => {
   const userId = req.user.id_user;
   const userRole = req.user.role;
 
-  const result = await TeamsService.rejectJoinRequest(parseInt(id), userId, userRole);
+  const result = await TeamsService.rejectJoinRequest(
+    parseInt(id),
+    userId,
+    userRole,
+  );
 
   return success(res, {
     message: "Solicitud rechazada correctamente",
+    ...result,
+  });
+});
+
+export const cancelJoinRequest = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id_user;
+
+  const result = await TeamsService.cancelJoinRequest(parseInt(id), userId);
+
+  return success(res, {
+    message: "Solicitud cancelada correctamente",
     ...result,
   });
 });
@@ -283,5 +308,6 @@ export default {
   getMyJoinRequests,
   acceptJoinRequest,
   rejectJoinRequest,
+  cancelJoinRequest,
   searchProjects,
 };
