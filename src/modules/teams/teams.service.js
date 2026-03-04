@@ -1,4 +1,5 @@
 import TeamsRepository from "./teams.repository.js";
+import ProjectsRepository from "../projects/projects.repository.js";
 import n8nService from "../../integrations/n8n.service.js";
 import {
   NotFoundError,
@@ -46,12 +47,12 @@ export const createTeam = async (
   // Idempotencia: si ya es líder de un equipo, devolver ese en vez de crear otro
   const existingTeam = await TeamsRepository.findLeaderTeam(leaderId);
   if (existingTeam) {
-    const project = await TeamsRepository.getTeamProject(existingTeam.id_team);
+    const project = await ProjectsRepository.findByTeamId(existingTeam.id_team);
     return {
       ...existingTeam,
       leader_id: leaderId,
       members: [],
-      repo_url: project?.repo_url ?? null,
+      project: project || null,
     };
   }
 
@@ -98,8 +99,20 @@ export const createTeam = async (
       inviteToken: null,
     });
 
+    // Guardar el proyecto con nombre y descripción
+    let project = await ProjectsRepository.create(team.id_team, {
+      name: data.name.trim(),
+      description: data.description?.trim() || `${data.name.trim()} project`,
+    });
+
+    // Actualizar el proyecto con el repo_url
+    if (repoUrl) {
+      project = await ProjectsRepository.update(project.id_project, { repoUrl });
+    }
+
     return {
       ...team,
+      project: project,
       repo_url: repoUrl,
     };
   } catch (error) {
@@ -135,7 +148,7 @@ export const getTeamById = async (id, userId, userRole) => {
     throw new ForbiddenError("No tienes acceso a este equipo");
   }
 
-  const project = await TeamsRepository.getTeamProject(id);
+  const project = await ProjectsRepository.findByTeamId(id);
 
   return {
     ...team,
@@ -150,7 +163,7 @@ export const getTeamSimple = async (id) => {
     throw new NotFoundError("Equipo no encontrado");
   }
 
-  const project = await TeamsRepository.getTeamProject(id);
+  const project = await ProjectsRepository.findByTeamId(id);
 
   return {
     ...team,
