@@ -146,6 +146,7 @@ export const login = async (
       email: user.email,
       role: user.role,
       clan: user.clan,
+      github_avatar_url: user.github_avatar_url ?? null,
     },
     token: tokens.token,
     refreshToken: tokens.refreshToken,
@@ -214,6 +215,7 @@ export const getMe = async (userId) => {
     document_number: user.document_number,
     document_type: user.document_type,
     clan: user.clan,
+    github_avatar_url: user.github_avatar_url ?? null,
     profile,
   };
 };
