@@ -4,9 +4,9 @@ import dotenv from 'dotenv';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Email individual personalizado
-const sendEmail = async ({ to, subject, html }) => {
+export const sendEmail = async ({ to, subject, html }) => {
     const { data, error } = await resend.emails.send({
-        from: 'Tu App <noreply@tudominio.com>',
+        from: 'Team Up <noreply@teamup.com>',
         to,
         subject,
         html,
@@ -17,28 +17,35 @@ const sendEmail = async ({ to, subject, html }) => {
 };
 
 // Emails masivos a múltiples usuarios (desde tu BD Postgres)
-const sendBulkEmails = async (users) => {
+export const sendBulkEmails = async (users) => {
     const results = [];
 
     for (const user of users) {
         const html = `
-      <h1>Hola, ${user.nombre}!</h1>
-      <p>Este es un mensaje personalizado para ti.</p>
-    `;
+            <h1>Hola, ${user.name}!</h1>
+            <p>Esta será tu cuenta para TeamUp.</p>
+            <p>Correo de acceso: ${user.email}</p>
+            <p>Contraseña: Riwi123!</p>
+        `;
 
         try {
             const result = await sendEmail({
                 to: user.email,
-                subject: `Hola ${user.nombre}, tenemos novedades`,
+                subject: `Hola ${user.name}, TeamUp tiene novedades para ti`,
                 html,
             });
             results.push({ email: user.email, success: true, id: result.id });
+            await new Promise(resolve => setTimeout(resolve, 100));
         } catch (err) {
             results.push({ email: user.email, success: false, error: err.message });
+            await new Promise(resolve => setTimeout(resolve, 100));
         }
     }
 
     return results;
 };
 
-module.exports = { sendEmail, sendBulkEmails };
+export default {
+    sendEmail,
+    sendBulkEmails
+};

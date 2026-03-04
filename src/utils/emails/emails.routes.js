@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { sendBulkEmails } from './resend.js'
+import sendBulkEmails from './resend.js'
 import pool from 'src/db/pool.js';
 
 const router = Router();
