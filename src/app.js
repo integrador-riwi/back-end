@@ -18,6 +18,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "https://front-end3-bice.vercel.app",
   "http://localhost:3000",
+  "https://team-up.crudzaso.com",
   "https://front-end-integrador-zatc.onrender.com/"
 ];
 

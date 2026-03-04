@@ -303,6 +303,7 @@ export const handleGithubCallback = async (code, userId) => {
   await AuthRepository.saveGithubTokens(userId, {
     githubId: githubUser.id,
     githubUsername: githubUser.login,
+    githubAvatarUrl: githubUser.avatarUrl,
     accessToken: tokenData.accessToken,
     refreshToken: tokenData.refreshToken,
     expiresAt,
@@ -339,6 +340,7 @@ export const getGithubConnection = async (userId) => {
     github: {
       id: connection.github_id,
       username: connection.github_username,
+      avatarUrl: connection.github_avatar_url ?? null,
       expiresAt: connection.github_token_expires_at,
     },
   };

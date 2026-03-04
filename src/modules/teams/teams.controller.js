@@ -9,7 +9,11 @@ export const create = asyncHandler(async (req, res) => {
   const userId = req.user.id_user;
   const userRole = req.user.role;
 
-  const team = await TeamsService.createTeam({ name, description }, userId, userRole);
+  const team = await TeamsService.createTeam(
+    { name, description },
+    userId,
+    userRole,
+  );
 
   return created(res, team);
 });
@@ -105,8 +109,10 @@ export const getMyTeams = asyncHandler(async (req, res) => {
   const userId = req.user.id_user;
 
   const teams = await TeamsService.getMyTeams(userId);
+  const pendingJoinRequests =
+    await TeamsService.getMyPendingJoinRequests(userId);
 
-  return success(res, teams);
+  return success(res, { ...teams, pendingJoinRequests });
 });
 
 export const getAvailable = asyncHandler(async (req, res) => {
@@ -175,6 +181,86 @@ export const leaveTeam = asyncHandler(async (req, res) => {
   return success(res, { message: "Has salido del equipo correctamente" });
 });
 
+export const requestJoinTeam = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id_user;
+
+  const result = await TeamsService.requestToJoinTeam(parseInt(id), userId);
+
+  return created(res, {
+    message: "Solicitud enviada correctamente",
+    ...result,
+  });
+});
+
+export const getTeamJoinRequests = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id_user;
+  const userRole = req.user.role;
+
+  const requests = await TeamsService.getTeamJoinRequests(
+    parseInt(id),
+    userId,
+    userRole,
+  );
+
+  return success(res, requests);
+});
+
+export const getMyJoinRequests = asyncHandler(async (req, res) => {
+  const userId = req.user.id_user;
+
+  const requests = await TeamsService.getMyPendingJoinRequests(userId);
+
+  return success(res, requests);
+});
+
+export const acceptJoinRequest = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id_user;
+  const userRole = req.user.role;
+
+  const result = await TeamsService.acceptJoinRequest(
+    parseInt(id),
+    userId,
+    userRole,
+  );
+
+  return success(res, {
+    message: "Solicitud aceptada correctamente",
+    ...result,
+  });
+});
+
+export const rejectJoinRequest = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id_user;
+  const userRole = req.user.role;
+
+  const result = await TeamsService.rejectJoinRequest(
+    parseInt(id),
+    userId,
+    userRole,
+  );
+
+  return success(res, {
+    message: "Solicitud rechazada correctamente",
+    ...result,
+  });
+});
+
+export const cancelJoinRequest = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id_user;
+
+  const result = await TeamsService.cancelJoinRequest(parseInt(id), userId);
+
+  return success(res, {
+    message: "Solicitud cancelada correctamente",
+    ...result,
+  });
+});
+
 // AI ChatGPT Search by Description
 export const searchProjects = asyncHandler(async (req, res) => {
   const { q, limit, min_similarity, exclude_project } = req.query;
@@ -217,5 +303,11 @@ export default {
   acceptInvitation,
   rejectInvitation,
   leaveTeam,
+  requestJoinTeam,
+  getTeamJoinRequests,
+  getMyJoinRequests,
+  acceptJoinRequest,
+  rejectJoinRequest,
+  cancelJoinRequest,
   searchProjects,
 };

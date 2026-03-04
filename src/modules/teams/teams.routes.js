@@ -63,4 +63,36 @@ router.post(
   TeamsController.rejectInvitation,
 );
 
+router.post("/:id/request-join", authenticate, TeamsController.requestJoinTeam);
+
+router.get(
+  "/:id/join-requests",
+  authenticate,
+  TeamsController.getTeamJoinRequests,
+);
+
+router.get(
+  "/join-requests/my",
+  authenticate,
+  TeamsController.getMyJoinRequests,
+);
+
+router.post(
+  "/join-requests/:id/accept",
+  authenticate,
+  TeamsController.acceptJoinRequest,
+);
+
+router.post(
+  "/join-requests/:id/reject",
+  authenticate,
+  TeamsController.rejectJoinRequest,
+);
+
+router.delete(
+  "/join-requests/:id/cancel",
+  authenticate,
+  TeamsController.cancelJoinRequest,
+);
+
 export default router;

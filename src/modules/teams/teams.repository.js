@@ -716,6 +716,253 @@ export const findLeaderTeam = async (userId) => {
   return result.rows[0] || null;
 };
 
+export const createJoinRequest = async (teamId, userId) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const checkExisting = `
+      SELECT id_request, status FROM team_join_requests 
+      WHERE id_team = $1 AND id_user = $2
+    `;
+    const existing = await client.query(checkExisting, [teamId, userId]);
+
+    if (existing.rows.length > 0) {
+      if (existing.rows[0].status === "PENDING") {
+        await client.query("ROLLBACK");
+        throw new ConflictError("Ya existe una solicitud pendiente");
+      }
+      if (existing.rows[0].status === "APPROVED") {
+        await client.query("ROLLBACK");
+        throw new ConflictError("Ya eres miembro del equipo");
+      }
+      const updateQuery = `
+        UPDATE team_join_requests 
+        SET status = 'PENDING', updated_at = NOW()
+        WHERE id_team = $1 AND id_user = $2
+        RETURNING id_request, id_team, id_user, status, created_at
+      `;
+      const result = await client.query(updateQuery, [teamId, userId]);
+      await client.query("COMMIT");
+      return result.rows[0];
+    }
+
+    const checkMemberQuery = `
+      SELECT id_team FROM team_coders 
+      WHERE id_team = $1 AND id_user = $2
+    `;
+    const memberResult = await client.query(checkMemberQuery, [teamId, userId]);
+
+    if (memberResult.rows.length > 0) {
+      await client.query("ROLLBACK");
+      throw new ConflictError("Ya eres miembro del equipo");
+    }
+
+    const query = `
+      INSERT INTO team_join_requests (id_team, id_user, status)
+      VALUES ($1, $2, 'PENDING')
+      RETURNING id_request, id_team, id_user, status, created_at
+    `;
+
+    const result = await client.query(query, [teamId, userId]);
+
+    await client.query("COMMIT");
+
+    return result.rows[0];
+  } catch (error) {
+    await client.query("ROLLBACK");
+    if (error instanceof ConflictError) {
+      throw error;
+    }
+    throw new DatabaseError(`Error al crear solicitud: ${error.message}`);
+  } finally {
+    client.release();
+  }
+};
+
+export const getJoinRequestsByTeam = async (teamId) => {
+  const query = `
+    SELECT 
+      r.id_request,
+      r.id_team,
+      r.id_user,
+      r.status,
+      r.created_at,
+      u.name as user_name,
+      u.email as user_email,
+      u.clan as user_clan
+    FROM team_join_requests r
+    JOIN users u ON r.id_user = u.id_user
+    WHERE r.id_team = $1
+    ORDER BY r.created_at DESC
+  `;
+  const result = await pool.query(query, [teamId]);
+  return result.rows;
+};
+
+export const getMyPendingJoinRequests = async (userId) => {
+  const query = `
+    SELECT 
+      r.id_request,
+      r.id_team,
+      r.id_user,
+      r.status,
+      r.created_at,
+      t.name as team_name
+    FROM team_join_requests r
+    JOIN teams t ON r.id_team = t.id_team
+    WHERE r.id_user = $1 AND r.status = 'PENDING'
+    ORDER BY r.created_at DESC
+  `;
+  const result = await pool.query(query, [userId]);
+  return result.rows;
+};
+
+export const getJoinRequestById = async (requestId) => {
+  const query = `
+    SELECT 
+      r.id_request,
+      r.id_team,
+      r.id_user,
+      r.status,
+      r.created_at,
+      t.name as team_name
+    FROM team_join_requests r
+    JOIN teams t ON r.id_team = t.id_team
+    WHERE r.id_request = $1
+  `;
+  const result = await pool.query(query, [requestId]);
+  return result.rows[0];
+};
+
+export const acceptJoinRequest = async (requestId) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const requestQuery = `
+      SELECT * FROM team_join_requests 
+      WHERE id_request = $1 AND status = 'PENDING'
+    `;
+    const requestResult = await client.query(requestQuery, [requestId]);
+
+    if (requestResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      throw new NotFoundError("Solicitud no encontrada o ya procesada");
+    }
+
+    const request = requestResult.rows[0];
+
+    const memberQuery = `
+      INSERT INTO team_coders (id_team, id_user, team_role)
+      VALUES ($1, $2, 'DEVELOPER')
+      ON CONFLICT (id_team, id_user) DO NOTHING
+    `;
+    await client.query(memberQuery, [request.id_team, request.id_user]);
+
+    const updateQuery = `
+      UPDATE team_join_requests
+      SET status = 'APPROVED', updated_at = NOW()
+      WHERE id_request = $1
+    `;
+    await client.query(updateQuery, [requestId]);
+
+    await client.query("COMMIT");
+
+    return { id_team: request.id_team, id_user: request.id_user };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    if (error instanceof NotFoundError || error instanceof ConflictError) {
+      throw error;
+    }
+    throw new DatabaseError(`Error al aceptar solicitud: ${error.message}`);
+  } finally {
+    client.release();
+  }
+};
+
+export const rejectJoinRequest = async (requestId) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const requestQuery = `
+      SELECT * FROM team_join_requests 
+      WHERE id_request = $1 AND status = 'PENDING'
+    `;
+    const requestResult = await client.query(requestQuery, [requestId]);
+
+    if (requestResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      throw new NotFoundError("Solicitud no encontrada o ya procesada");
+    }
+
+    const updateQuery = `
+      UPDATE team_join_requests
+      SET status = 'REJECTED', updated_at = NOW()
+      WHERE id_request = $1
+    `;
+    await client.query(updateQuery, [requestId]);
+
+    await client.query("COMMIT");
+
+    return { id_request: requestId, status: "REJECTED" };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+    throw new DatabaseError(`Error al rechazar solicitud: ${error.message}`);
+  } finally {
+    client.release();
+  }
+};
+
+export const isInAnyTeam = async (userId) => {
+  const query = `
+    SELECT id_team FROM team_coders WHERE id_user = $1 LIMIT 1
+  `;
+  const result = await pool.query(query, [userId]);
+  return result.rows.length > 0;
+};
+
+export const cancelJoinRequest = async (requestId, userId) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const requestQuery = `
+      SELECT * FROM team_join_requests
+      WHERE id_request = $1 AND id_user = $2 AND status = 'PENDING'
+    `;
+    const requestResult = await client.query(requestQuery, [requestId, userId]);
+
+    if (requestResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      throw new NotFoundError("Solicitud no encontrada o ya procesada");
+    }
+
+    const updateQuery = `
+      UPDATE team_join_requests
+      SET status = 'CANCELLED', updated_at = NOW()
+      WHERE id_request = $1
+    `;
+    await client.query(updateQuery, [requestId]);
+
+    await client.query("COMMIT");
+
+    return { id_request: requestId, status: "CANCELLED" };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+    throw new DatabaseError(`Error al cancelar solicitud: ${error.message}`);
+  } finally {
+    client.release();
+  }
+};
+
 export default {
   create,
   findAll,
@@ -741,4 +988,12 @@ export default {
   getTeamProject,
   saveTeamProject,
   findLeaderTeam,
+  createJoinRequest,
+  getJoinRequestsByTeam,
+  getMyPendingJoinRequests,
+  getJoinRequestById,
+  acceptJoinRequest,
+  rejectJoinRequest,
+  isInAnyTeam,
+  cancelJoinRequest,
 };
