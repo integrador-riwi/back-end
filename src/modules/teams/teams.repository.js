@@ -728,11 +728,11 @@ export const createJoinRequest = async (teamId, userId) => {
     const existing = await client.query(checkExisting, [teamId, userId]);
 
     if (existing.rows.length > 0) {
-      if (existing.rows[0].status === 'PENDING') {
+      if (existing.rows[0].status === "PENDING") {
         await client.query("ROLLBACK");
         throw new ConflictError("Ya existe una solicitud pendiente");
       }
-      if (existing.rows[0].status === 'APPROVED') {
+      if (existing.rows[0].status === "APPROVED") {
         await client.query("ROLLBACK");
         throw new ConflictError("Ya eres miembro del equipo");
       }
@@ -918,6 +918,51 @@ export const rejectJoinRequest = async (requestId) => {
   }
 };
 
+export const isInAnyTeam = async (userId) => {
+  const query = `
+    SELECT id_team FROM team_coders WHERE id_user = $1 LIMIT 1
+  `;
+  const result = await pool.query(query, [userId]);
+  return result.rows.length > 0;
+};
+
+export const cancelJoinRequest = async (requestId, userId) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const requestQuery = `
+      SELECT * FROM team_join_requests
+      WHERE id_request = $1 AND id_user = $2 AND status = 'PENDING'
+    `;
+    const requestResult = await client.query(requestQuery, [requestId, userId]);
+
+    if (requestResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      throw new NotFoundError("Solicitud no encontrada o ya procesada");
+    }
+
+    const updateQuery = `
+      UPDATE team_join_requests
+      SET status = 'CANCELLED', updated_at = NOW()
+      WHERE id_request = $1
+    `;
+    await client.query(updateQuery, [requestId]);
+
+    await client.query("COMMIT");
+
+    return { id_request: requestId, status: "CANCELLED" };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+    throw new DatabaseError(`Error al cancelar solicitud: ${error.message}`);
+  } finally {
+    client.release();
+  }
+};
+
 export default {
   create,
   findAll,
@@ -949,4 +994,6 @@ export default {
   getJoinRequestById,
   acceptJoinRequest,
   rejectJoinRequest,
+  isInAnyTeam,
+  cancelJoinRequest,
 };
