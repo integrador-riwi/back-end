@@ -545,6 +545,77 @@ export const rejectInvitation = async (invitationId, userId) => {
   return TeamsRepository.rejectInvitation(invitationId, userId);
 };
 
+export const requestToJoinTeam = async (teamId, userId) => {
+  const team = await TeamsRepository.findById(teamId);
+  if (!team) {
+    throw new NotFoundError("Equipo no encontrado");
+  }
+
+  const userWithGithub = await TeamsRepository.getMemberWithGithub(userId);
+  if (!userWithGithub || !userWithGithub.github_username) {
+    throw new ValidationError(
+      "Debes tener GitHub conectado para solicitar unirte a un equipo",
+    );
+  }
+
+  const currentMembers = await TeamsRepository.countTeamMembers(teamId);
+  if (currentMembers >= MAX_TEAM_MEMBERS) {
+    throw new ValidationError(
+      `El equipo ya tiene el máximo de ${MAX_TEAM_MEMBERS} miembros`,
+    );
+  }
+
+  return TeamsRepository.createJoinRequest(teamId, userId);
+};
+
+export const getTeamJoinRequests = async (teamId, userId, userRole) => {
+  const isLeaderOrAdmin = await TeamsRepository.isLeader(teamId, userId);
+  const isAdmin = userRole === "ADMIN";
+
+  if (!isLeaderOrAdmin && !isAdmin) {
+    throw new ForbiddenError("No tienes permiso para ver las solicitudes");
+  }
+
+  return TeamsRepository.getJoinRequestsByTeam(teamId);
+};
+
+export const getMyPendingJoinRequests = async (userId) => {
+  return TeamsRepository.getMyPendingJoinRequests(userId);
+};
+
+export const acceptJoinRequest = async (requestId, userId, userRole) => {
+  const request = await TeamsRepository.getJoinRequestById(requestId);
+  if (!request) {
+    throw new NotFoundError("Solicitud no encontrada");
+  }
+
+  const isLeaderOrAdmin = await TeamsRepository.isLeader(request.id_team, userId);
+  const isAdmin = userRole === "ADMIN";
+
+  if (!isLeaderOrAdmin && !isAdmin) {
+    throw new ForbiddenError("No tienes permiso para aceptar esta solicitud");
+  }
+
+  const result = await TeamsRepository.acceptJoinRequest(requestId);
+  return result;
+};
+
+export const rejectJoinRequest = async (requestId, userId, userRole) => {
+  const request = await TeamsRepository.getJoinRequestById(requestId);
+  if (!request) {
+    throw new NotFoundError("Solicitud no encontrada");
+  }
+
+  const isLeaderOrAdmin = await TeamsRepository.isLeader(request.id_team, userId);
+  const isAdmin = userRole === "ADMIN";
+
+  if (!isLeaderOrAdmin && !isAdmin) {
+    throw new ForbiddenError("No tienes permiso para rechazar esta solicitud");
+  }
+
+  return TeamsRepository.rejectJoinRequest(requestId);
+};
+
 export default {
   createTeam,
   listTeams,
@@ -561,4 +632,9 @@ export default {
   getMyPendingInvitations,
   acceptInvitation,
   rejectInvitation,
+  requestToJoinTeam,
+  getTeamJoinRequests,
+  getMyPendingJoinRequests,
+  acceptJoinRequest,
+  rejectJoinRequest,
 };
