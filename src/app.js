@@ -9,6 +9,8 @@ import eventsRoutes from "./modules/events/events.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import config from "./config/env.js";
 
+import emailRoutes from './utils/emails/emails.routes.js';
+
 const app = express();
 
 const allowedOrigins = [
@@ -44,6 +46,9 @@ app.use("/api/users", usersRoutes);
 app.use("/api/teams", teamsRoutes);
 app.use("/api/projects", projectsRoutes);
 app.use("/api/events", eventsRoutes);
+
+// Endpoint to send emails
+app.use('/api/emails', emailRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, error: "Endpoint no encontrado" });
