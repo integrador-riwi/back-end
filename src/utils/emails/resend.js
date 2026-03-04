@@ -1,4 +1,4 @@
-const { Resend } = require('resend');
+import { Resend } from 'resend';
 import dotenv from 'dotenv';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
