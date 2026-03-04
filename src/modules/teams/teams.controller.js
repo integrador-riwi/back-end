@@ -5,11 +5,11 @@ import { asyncHandler } from "../../middleware/errorHandler.js";
 import { searchProjectByDescription } from "../../integrations/Google AI/searchService.js";
 
 export const create = asyncHandler(async (req, res) => {
-  const { name } = req.body;
+  const { name, description } = req.body;
   const userId = req.user.id_user;
   const userRole = req.user.role;
 
-  const team = await TeamsService.createTeam({ name }, userId, userRole);
+  const team = await TeamsService.createTeam({ name, description }, userId, userRole);
 
   return created(res, team);
 });
