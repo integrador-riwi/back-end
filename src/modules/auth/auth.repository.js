@@ -7,14 +7,14 @@ import {
 
 export const findByEmail = async (email) => {
   const query =
-    "SELECT id_user, name, email, role, encrypted_password, document_number, document_type, clan, is_active FROM users WHERE email = $1";
+    "SELECT id_user, name, email, role, encrypted_password, document_number, document_type, clan, is_active, github_avatar_url FROM users WHERE email = $1";
   const result = await pool.query(query, [email.toLowerCase()]);
   return result.rows[0] || null;
 };
 
 export const findById = async (id_user) => {
   const query =
-    "SELECT id_user, name, email, role, encrypted_password, document_number, document_type, clan, is_active FROM users WHERE id_user = $1";
+    "SELECT id_user, name, email, role, encrypted_password, document_number, document_type, clan, is_active, github_avatar_url FROM users WHERE id_user = $1";
   const result = await pool.query(query, [id_user]);
   return result.rows[0] || null;
 };
