@@ -8,7 +8,7 @@ import projectsRoutes from "./modules/projects/projects.routes.js";
 import eventsRoutes from "./modules/events/events.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import config from "./config/env.js";
-
+import githubWebhookRouter from './integrations/github.webhook.js';
 import emailRoutes from './utils/emails/emails.routes.js';
 
 const app = express();
@@ -34,6 +34,8 @@ app.use(
     credentials: true,
   }),
 );
+
+app.use('/api/webhooks', githubWebhookRouter);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
