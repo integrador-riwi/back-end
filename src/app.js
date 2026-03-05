@@ -6,10 +6,11 @@ import usersRoutes from "./modules/users/users.routes.js";
 import teamsRoutes from "./modules/teams/teams.routes.js";
 import projectsRoutes from "./modules/projects/projects.routes.js";
 import eventsRoutes from "./modules/events/events.routes.js";
+import commentsRoutes from "./modules/comments/comments.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import config from "./config/env.js";
-import githubWebhookRouter from './integrations/github.webhook.js';
-import emailRoutes from './utils/emails/emails.routes.js';
+import githubWebhookRouter from "./integrations/github.webhook.js";
+import emailRoutes from "./utils/emails/emails.routes.js";
 
 const app = express();
 
@@ -19,7 +20,7 @@ const allowedOrigins = [
   "https://front-end3-bice.vercel.app",
   "http://localhost:3000",
   "https://team-up.crudzaso.com",
-  "https://front-end-integrador-zatc.onrender.com"
+  "https://front-end-integrador-zatc.onrender.com",
 ];
 
 app.use(
@@ -35,7 +36,7 @@ app.use(
   }),
 );
 
-app.use('/api/webhooks', githubWebhookRouter);
+app.use("/api/webhooks", githubWebhookRouter);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -50,9 +51,10 @@ app.use("/api/users", usersRoutes);
 app.use("/api/teams", teamsRoutes);
 app.use("/api/projects", projectsRoutes);
 app.use("/api/events", eventsRoutes);
+app.use("/api/comments", commentsRoutes);
 
 // Endpoint to send emails
-app.use('/api/emails', emailRoutes);
+app.use("/api/emails", emailRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, error: "Endpoint no encontrado" });
