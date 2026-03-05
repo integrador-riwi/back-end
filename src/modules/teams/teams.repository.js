@@ -78,14 +78,28 @@ export const findAll = async ({ search = null, page = 1, limit = 10 }) => {
       u.id_user as leader_id,
       u.name as leader_name,
       u.email as leader_email,
+      u.github_avatar_url as leader_avatar_url,
       p.description,
-      (SELECT COUNT(*) FROM team_coders tc2 WHERE tc2.id_team = t.id_team) as member_count
+      (SELECT COUNT(*) FROM team_coders tc2 WHERE tc2.id_team = t.id_team) as member_count,
+      (
+        SELECT json_agg(
+          json_build_object(
+            'id_user', mu.id_user,
+            'name', mu.name,
+            'github_avatar_url', mu.github_avatar_url,
+            'team_role', mtc.team_role
+          ) ORDER BY CASE mtc.team_role WHEN 'LEADER' THEN 1 ELSE 2 END
+        )
+        FROM team_coders mtc
+        JOIN users mu ON mtc.id_user = mu.id_user
+        WHERE mtc.id_team = t.id_team
+      ) as members
     FROM teams t
     LEFT JOIN team_coders tc ON t.id_team = tc.id_team AND tc.team_role = 'LEADER'
     LEFT JOIN users u ON tc.id_user = u.id_user
     LEFT JOIN projects p ON p.team_id = t.id_team
     ${whereClause}
-    GROUP BY t.id_team, u.id_user, u.name, u.email, t.created_at, p.description
+    GROUP BY t.id_team, u.id_user, u.name, u.email, u.github_avatar_url, t.created_at, p.description
     ORDER BY t.created_at DESC
     LIMIT $${paramIndex++} OFFSET $${paramIndex++}
   `;
