@@ -78,12 +78,14 @@ export const findAll = async ({ search = null, page = 1, limit = 10 }) => {
       u.id_user as leader_id,
       u.name as leader_name,
       u.email as leader_email,
-      COUNT(tc.id_user) as member_count
+      p.description,
+      (SELECT COUNT(*) FROM team_coders tc2 WHERE tc2.id_team = t.id_team) as member_count
     FROM teams t
     LEFT JOIN team_coders tc ON t.id_team = tc.id_team AND tc.team_role = 'LEADER'
     LEFT JOIN users u ON tc.id_user = u.id_user
+    LEFT JOIN projects p ON p.team_id = t.id_team
     ${whereClause}
-    GROUP BY t.id_team, u.id_user, u.name, u.email, t.created_at
+    GROUP BY t.id_team, u.id_user, u.name, u.email, t.created_at, p.description
     ORDER BY t.created_at DESC
     LIMIT $${paramIndex++} OFFSET $${paramIndex++}
   `;
