@@ -1,0 +1,17 @@
+
+ALTER TABLE events
+  ADD COLUMN IF NOT EXISTS github_org        VARCHAR(255) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS github_org_token  TEXT         DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS max_team_size     INTEGER      DEFAULT 5;
+
+ALTER TABLE teams
+  ADD COLUMN IF NOT EXISTS id_event INTEGER DEFAULT NULL
+    REFERENCES events(id_event) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_teams_event ON teams(id_event);
+
+ALTER TABLE projects
+  ADD COLUMN IF NOT EXISTS id_event INTEGER DEFAULT NULL
+    REFERENCES events(id_event) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_projects_event ON projects(id_event);

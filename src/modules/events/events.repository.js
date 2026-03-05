@@ -1,4 +1,4 @@
-import pool from '../../db/pool.js';
+import pool from "../../db/pool.js";
 
 export const findAll = async ({ status, search, page = 1, limit = 10 }) => {
   let whereClauses = [];
@@ -11,14 +11,15 @@ export const findAll = async ({ status, search, page = 1, limit = 10 }) => {
   }
 
   if (search) {
-    whereClauses.push(`(title ILIKE $${paramIndex} OR description ILIKE $${paramIndex})`);
+    whereClauses.push(
+      `(title ILIKE $${paramIndex} OR description ILIKE $${paramIndex})`,
+    );
     params.push(`%${search}%`);
     paramIndex++;
   }
 
-  const whereClause = whereClauses.length > 0 
-    ? `WHERE ${whereClauses.join(' AND ')}` 
-    : '';
+  const whereClause =
+    whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
   const offset = (page - 1) * limit;
 
@@ -37,7 +38,9 @@ export const findAll = async ({ status, search, page = 1, limit = 10 }) => {
       event_status as status,
       event_type,
       cohort,
-      route
+      route,
+      github_org,
+      max_team_size
     FROM events
     ${whereClause}
     ORDER BY event_start_date ASC
@@ -53,8 +56,8 @@ export const findAll = async ({ status, search, page = 1, limit = 10 }) => {
       page,
       limit,
       total,
-      totalPages: Math.ceil(total / limit)
-    }
+      totalPages: Math.ceil(total / limit),
+    },
   };
 };
 
@@ -70,7 +73,9 @@ export const findById = async (id) => {
       event_status as status,
       event_type,
       cohort,
-      route
+      route,
+      github_org,
+      max_team_size
     FROM events
     WHERE id_event = $1
   `;
@@ -91,7 +96,9 @@ export const findUpcoming = async (limit = 10) => {
       event_status as status,
       event_type,
       cohort,
-      route
+      route,
+      github_org,
+      max_team_size
     FROM events
     WHERE event_status = 'UPCOMING' OR event_start_date >= NOW()
     ORDER BY event_start_date ASC
@@ -114,7 +121,9 @@ export const findPast = async (limit = 10) => {
       event_status as status,
       event_type,
       cohort,
-      route
+      route,
+      github_org,
+      max_team_size
     FROM events
     WHERE event_status = 'COMPLETED' OR event_start_date < NOW()
     ORDER BY event_start_date DESC
@@ -125,20 +134,22 @@ export const findPast = async (limit = 10) => {
   return result.rows;
 };
 
-export const create = async ({ 
-  title, 
-  description, 
-  eventDate, 
+export const create = async ({
+  title,
+  description,
+  eventDate,
   endDate,
-  status = 'UPCOMING',
-  eventType = 'CAPSTONE',
+  status = "UPCOMING",
+  eventType = "CAPSTONE",
   cohort,
-  route
+  route,
+  githubOrg = null,
+  maxTeamSize = 5,
 }) => {
   const query = `
-    INSERT INTO events (title, event_name, description, event_start_date, final_delivery_date, event_status, status, event_type, cohort, route)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-    RETURNING id_event as id, title, event_name, description, event_start_date as date, event_status as status, event_type, cohort, route
+    INSERT INTO events (title, event_name, description, event_start_date, final_delivery_date, event_status, status, event_type, cohort, route, github_org, max_team_size)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    RETURNING id_event as id, title, event_name, description, event_start_date as date, event_status as status, event_type, cohort, route, github_org, max_team_size
   `;
 
   const result = await pool.query(query, [
@@ -151,22 +162,29 @@ export const create = async ({
     status,
     eventType,
     cohort,
-    route
+    route,
+    githubOrg,
+    maxTeamSize,
   ]);
 
   return result.rows[0];
 };
 
-export const update = async (id, { 
-  title, 
-  description, 
-  eventDate, 
-  endDate,
-  status,
-  eventType,
-  cohort,
-  route
-}) => {
+export const update = async (
+  id,
+  {
+    title,
+    description,
+    eventDate,
+    endDate,
+    status,
+    eventType,
+    cohort,
+    route,
+    githubOrg = null,
+    maxTeamSize = null,
+  },
+) => {
   const query = `
     UPDATE events
     SET 
@@ -180,9 +198,11 @@ export const update = async (id, {
       event_type = COALESCE($6, event_type),
       cohort = COALESCE($7, cohort),
       route = COALESCE($8, route),
+      github_org = COALESCE($9, github_org),
+      max_team_size = COALESCE($10, max_team_size),
       updated_at = NOW()
-    WHERE id_event = $9
-    RETURNING id_event as id, title, event_name, description, event_start_date as date, event_status as status, event_type, cohort, route
+    WHERE id_event = $11
+    RETURNING id_event as id, title, event_name, description, event_start_date as date, event_status as status, event_type, cohort, route, github_org, max_team_size
   `;
 
   const result = await pool.query(query, [
@@ -194,7 +214,9 @@ export const update = async (id, {
     eventType,
     cohort,
     route,
-    id
+    githubOrg,
+    maxTeamSize,
+    id,
   ]);
 
   return result.rows[0] || null;
@@ -212,11 +234,11 @@ export const remove = async (id) => {
 };
 
 export const count = async ({ status }) => {
-  let whereClause = '';
+  let whereClause = "";
   let params = [];
 
   if (status) {
-    whereClause = 'WHERE event_status = $1';
+    whereClause = "WHERE event_status = $1";
     params.push(status);
   }
 
@@ -234,5 +256,5 @@ export default {
   create,
   update,
   remove,
-  count
+  count,
 };
