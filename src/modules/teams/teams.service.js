@@ -442,13 +442,7 @@ export const getTeamMembers = async (id, userId, userRole) => {
     throw new NotFoundError("Equipo no encontrado");
   }
 
-  const isMember = await TeamsRepository.isMember(id, userId);
-  const isAdmin = userRole === "ADMIN";
-
-  if (!isMember && !isAdmin) {
-    throw new ForbiddenError("No tienes acceso a este equipo");
-  }
-
+  // Any authenticated user can view team members (needed for public team listing/discovery)
   return TeamsRepository.findByIdWithMembers(id);
 };
 
