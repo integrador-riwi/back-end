@@ -16,6 +16,10 @@ export const getEventById = async (id) => {
   return event;
 };
 
+export const getActiveEvents = async () => {
+  return await EventsRepository.findActive();
+};
+
 export const getUpcomingEvents = async (limit) => {
   return await EventsRepository.findUpcoming(limit);
 };

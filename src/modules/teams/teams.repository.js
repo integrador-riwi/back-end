@@ -5,19 +5,19 @@ import {
   DatabaseError,
 } from "../../middleware/errorHandler.js";
 
-export const create = async ({ name, leaderId }) => {
+export const create = async ({ name, leaderId, idEvent = null }) => {
   const client = await pool.connect();
 
   try {
     await client.query("BEGIN");
 
     const teamQuery = `
-      INSERT INTO teams (name)
-      VALUES ($1)
-      RETURNING id_team, name, created_at
+      INSERT INTO teams (name, id_event)
+      VALUES ($1, $2)
+      RETURNING id_team, name, id_event, created_at
     `;
 
-    const teamResult = await client.query(teamQuery, [name]);
+    const teamResult = await client.query(teamQuery, [name, idEvent]);
     const team = teamResult.rows[0];
 
     const memberQuery = `
@@ -47,7 +47,12 @@ export const create = async ({ name, leaderId }) => {
   }
 };
 
-export const findAll = async ({ search = null, page = 1, limit = 10 }) => {
+export const findAll = async ({
+  search = null,
+  page = 1,
+  limit = 10,
+  idEvent = null,
+}) => {
   let whereClauses = [];
   let params = [];
   let paramIndex = 1;
@@ -55,6 +60,11 @@ export const findAll = async ({ search = null, page = 1, limit = 10 }) => {
   if (search) {
     whereClauses.push(`t.name ILIKE $${paramIndex++}`);
     params.push(`%${search}%`);
+  }
+
+  if (idEvent) {
+    whereClauses.push(`t.id_event = $${paramIndex++}`);
+    params.push(idEvent);
   }
 
   const whereClause =
@@ -74,6 +84,7 @@ export const findAll = async ({ search = null, page = 1, limit = 10 }) => {
     SELECT 
       t.id_team,
       t.name,
+      t.id_event,
       t.created_at,
       u.id_user as leader_id,
       u.name as leader_name,
@@ -123,6 +134,7 @@ export const findById = async (id) => {
     SELECT 
       t.id_team,
       t.name,
+      t.id_event,
       t.created_at,
       u.id_user as leader_id,
       u.name as leader_name,
@@ -142,6 +154,7 @@ export const findByIdWithMembers = async (id) => {
     SELECT 
       t.id_team,
       t.name,
+      t.id_event,
       t.created_at,
       lu.id_user as leader_id,
       lu.name as leader_name,
@@ -337,6 +350,7 @@ export const getMyTeams = async (userId) => {
       t.id_team,
       t.name,
       t.created_at,
+      t.id_event,
       tc.team_role,
       u.id_user as leader_id,
       u.name as leader_name,
@@ -382,17 +396,36 @@ export const getAvailableCoders = async (
   teamId,
   { search = null, page = 1, limit = 20 },
 ) => {
+  // Get the event this team belongs to, so we exclude only members of teams in the same event
+  const teamEventQuery = `SELECT id_event FROM teams WHERE id_team = $1`;
+  const teamEventResult = await pool.query(teamEventQuery, [teamId]);
+  const idEvent = teamEventResult.rows[0]?.id_event ?? null;
+
   let whereClauses = ["u.role = $1", "u.is_active = true"];
   let params = ["CODER"];
   let paramIndex = 2;
 
-  const notInTeamSubquery = `
-    NOT EXISTS (
-      SELECT 1 FROM team_coders tc2 
-      WHERE tc2.id_user = u.id_user
-    )
-  `;
-  whereClauses.push(notInTeamSubquery);
+  // Exclude users already in a team for the SAME event (not globally)
+  if (idEvent) {
+    const notInEventTeamSubquery = `
+      NOT EXISTS (
+        SELECT 1 FROM team_coders tc2
+        JOIN teams t2 ON tc2.id_team = t2.id_team
+        WHERE tc2.id_user = u.id_user AND t2.id_event = $${paramIndex}
+      )
+    `;
+    whereClauses.push(notInEventTeamSubquery);
+    params.push(idEvent);
+    paramIndex++;
+  } else {
+    // No event context: fall back to global exclusion
+    whereClauses.push(`
+      NOT EXISTS (
+        SELECT 1 FROM team_coders tc2 
+        WHERE tc2.id_user = u.id_user
+      )
+    `);
+  }
 
   if (search) {
     whereClauses.push(
@@ -486,6 +519,28 @@ export const getTeamProject = async (teamId) => {
   `;
   const result = await pool.query(query, [teamId]);
   return result.rows[0] || null;
+};
+
+export const getTeamGithubOrg = async (teamId) => {
+  const query = `
+    SELECT e.github_org
+    FROM teams t
+    LEFT JOIN events e ON t.id_event = e.id_event
+    WHERE t.id_team = $1
+  `;
+  const result = await pool.query(query, [teamId]);
+  return result.rows[0]?.github_org ?? null;
+};
+
+export const getTeamEventMaxSize = async (teamId) => {
+  const query = `
+    SELECT COALESCE(e.max_team_size, 5) as max_team_size
+    FROM teams t
+    LEFT JOIN events e ON t.id_event = e.id_event
+    WHERE t.id_team = $1
+  `;
+  const result = await pool.query(query, [teamId]);
+  return result.rows[0]?.max_team_size ?? 5;
 };
 
 export const saveTeamProject = async (
@@ -721,12 +776,25 @@ export const rejectInvitation = async (invitationId, userId) => {
   }
 };
 
-export const findLeaderTeam = async (userId) => {
+export const findLeaderTeam = async (userId, idEvent = null) => {
+  if (idEvent) {
+    const query = `
+      SELECT t.id_team, t.name, t.created_at, t.id_event
+      FROM teams t
+      JOIN team_coders tc ON t.id_team = tc.id_team
+      WHERE tc.id_user = $1 AND tc.team_role = 'LEADER' AND t.id_event = $2
+      LIMIT 1
+    `;
+    const result = await pool.query(query, [userId, idEvent]);
+    return result.rows[0] || null;
+  }
+  // Fallback: return most recent leader team regardless of event
   const query = `
-    SELECT t.id_team, t.name, t.created_at
+    SELECT t.id_team, t.name, t.created_at, t.id_event
     FROM teams t
     JOIN team_coders tc ON t.id_team = tc.id_team
     WHERE tc.id_user = $1 AND tc.team_role = 'LEADER'
+    ORDER BY t.created_at DESC
     LIMIT 1
   `;
   const result = await pool.query(query, [userId]);
@@ -935,7 +1003,20 @@ export const rejectJoinRequest = async (requestId) => {
   }
 };
 
-export const isInAnyTeam = async (userId) => {
+export const isInAnyTeam = async (userId, idEvent = null) => {
+  // If an event is provided, only check membership within that event's teams
+  if (idEvent) {
+    const query = `
+      SELECT tc.id_team 
+      FROM team_coders tc
+      JOIN teams t ON tc.id_team = t.id_team
+      WHERE tc.id_user = $1 AND t.id_event = $2
+      LIMIT 1
+    `;
+    const result = await pool.query(query, [userId, idEvent]);
+    return result.rows.length > 0;
+  }
+  // Fallback: global check (used when no event context)
   const query = `
     SELECT id_team FROM team_coders WHERE id_user = $1 LIMIT 1
   `;
@@ -1004,6 +1085,8 @@ export default {
   countTeamMembers,
   getTeamProject,
   saveTeamProject,
+  getTeamGithubOrg,
+  getTeamEventMaxSize,
   findLeaderTeam,
   createJoinRequest,
   getJoinRequestsByTeam,

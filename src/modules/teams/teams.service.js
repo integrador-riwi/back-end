@@ -7,8 +7,6 @@ import {
   ValidationError,
 } from "../../middleware/errorHandler.js";
 
-const MAX_TEAM_MEMBERS = 5;
-
 export const createTeam = async (
   data,
   leaderId,
@@ -44,9 +42,12 @@ export const createTeam = async (
     );
   }
 
-  // Idempotencia: si ya es líder de un equipo, devolver ese en vez de crear otro
-  const existingTeam = await TeamsRepository.findLeaderTeam(leaderId);
-  if (existingTeam) {
+  // Idempotencia: si ya es líder de un equipo en el MISMO evento, devolver ese
+  const existingTeam = await TeamsRepository.findLeaderTeam(
+    leaderId,
+    data.idEvent ?? null,
+  );
+  if (existingTeam && existingTeam.id_event === data.idEvent) {
     const project = await ProjectsRepository.findByTeamId(existingTeam.id_team);
     return {
       ...existingTeam,
@@ -59,15 +60,31 @@ export const createTeam = async (
   const team = await TeamsRepository.create({
     name: data.name.trim(),
     leaderId,
+    idEvent: data.idEvent ?? null,
   });
 
   try {
     const repoName = `project-${team.id_team}-${data.name.toLowerCase().replace(/\s+/g, "-")}`;
 
+    // Fetch event to get githubOrg if provided
+    let githubOrg = null;
+    console.log("[createTeam] data.idEvent:", data.idEvent);
+    if (data.idEvent) {
+      try {
+        const { findById: findEvent } =
+          await import("../events/events.repository.js");
+        const event = await findEvent(data.idEvent);
+        githubOrg = event?.github_org ?? null;
+        console.log("[createTeam] event:", event);
+        console.log("[createTeam] githubOrg:", githubOrg);
+      } catch (_) {}
+    }
+
     const n8nResponse = await n8nService.triggerProjectCreated(
       {
         id: team.id_team,
         name: data.name.trim(),
+        githubOrg,
       },
       {
         githubUsername: leaderWithGithub.github_username,
@@ -124,7 +141,7 @@ export const createTeam = async (
 };
 
 export const listTeams = async (query) => {
-  const { search, page, limit } = query;
+  const { search, page, limit, idEvent } = query;
 
   const pageNum = parseInt(page) || 1;
   const limitNum = parseInt(limit) || 10;
@@ -133,7 +150,12 @@ export const listTeams = async (query) => {
     throw new ValidationError("Parámetros de paginación inválidos");
   }
 
-  return TeamsRepository.findAll({ search, page: pageNum, limit: limitNum });
+  return TeamsRepository.findAll({
+    search,
+    page: pageNum,
+    limit: limitNum,
+    idEvent,
+  });
 };
 
 export const getTeamById = async (id, userId, userRole) => {
@@ -258,11 +280,12 @@ export const addMemberToTeam = async (teamId, memberData, userId, userRole) => {
   }
 
   const currentMembers = await TeamsRepository.countTeamMembers(teamId);
-  const canAddMore = isAdmin || currentMembers < MAX_TEAM_MEMBERS;
+  const eventMaxSize = await TeamsRepository.getTeamEventMaxSize(teamId);
+  const canAddMore = isAdmin || currentMembers < eventMaxSize;
 
   if (!canAddMore) {
     throw new ValidationError(
-      `El equipo ya tiene el máximo de ${MAX_TEAM_MEMBERS} miembros`,
+      `El equipo ya tiene el máximo de ${eventMaxSize} miembros`,
     );
   }
 
@@ -289,12 +312,14 @@ export const addMemberToTeam = async (teamId, memberData, userId, userRole) => {
 
     if (leaderWithGithub && teamProject) {
       console.log("[n8n] Firing triggerMemberInvited...");
+      const githubOrg1 = await TeamsRepository.getTeamGithubOrg(teamId);
       await n8nService.triggerMemberInvited(
         {
           id: teamId,
           projectId: teamId,
           repoName: teamProject.repo_name,
           leaderGithubUsername: leaderWithGithub.github_username,
+          githubOrg: githubOrg1,
         },
         {
           githubUsername: memberWithGithub.github_username,
@@ -500,12 +525,14 @@ export const acceptInvitation = async (invitationId, userId) => {
     const teamProject = await TeamsRepository.getTeamProject(teamId);
 
     if (leaderWithGithub && teamProject?.repo_name) {
+      const githubOrg2 = await TeamsRepository.getTeamGithubOrg(teamId);
       await n8nService.triggerMemberInvited(
         {
           id: teamId,
           projectId: teamId,
           repoName: teamProject.repo_name,
           leaderGithubUsername: leaderWithGithub.github_username,
+          githubOrg: githubOrg2,
         },
         {
           githubUsername: memberWithGithub.github_username,
@@ -547,9 +574,12 @@ export const requestToJoinTeam = async (teamId, userId) => {
     throw new NotFoundError("Equipo no encontrado");
   }
 
-  const alreadyInTeam = await TeamsRepository.isInAnyTeam(userId);
+  const alreadyInTeam = await TeamsRepository.isInAnyTeam(
+    userId,
+    team.id_event ?? null,
+  );
   if (alreadyInTeam) {
-    throw new ValidationError("Ya perteneces a un equipo");
+    throw new ValidationError("Ya perteneces a un equipo en este evento");
   }
 
   const userWithGithub = await TeamsRepository.getMemberWithGithub(userId);
@@ -560,9 +590,10 @@ export const requestToJoinTeam = async (teamId, userId) => {
   }
 
   const currentMembers = await TeamsRepository.countTeamMembers(teamId);
-  if (currentMembers >= MAX_TEAM_MEMBERS) {
+  const eventMaxSize = await TeamsRepository.getTeamEventMaxSize(teamId);
+  if (currentMembers >= eventMaxSize) {
     throw new ValidationError(
-      `El equipo ya tiene el máximo de ${MAX_TEAM_MEMBERS} miembros`,
+      `El equipo ya tiene el máximo de ${eventMaxSize} miembros`,
     );
   }
 
@@ -621,12 +652,14 @@ export const acceptJoinRequest = async (requestId, userId, userRole) => {
       leaderWithGithub &&
       teamProject?.repo_name
     ) {
+      const githubOrg3 = await TeamsRepository.getTeamGithubOrg(teamId);
       await n8nService.triggerMemberInvited(
         {
           id: teamId,
           projectId: teamId,
           repoName: teamProject.repo_name,
           leaderGithubUsername: leaderWithGithub.github_username,
+          githubOrg: githubOrg3,
         },
         {
           githubUsername: memberWithGithub.github_username,

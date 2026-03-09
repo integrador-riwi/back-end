@@ -84,6 +84,29 @@ export const findById = async (id) => {
   return result.rows[0] || null;
 };
 
+export const findActive = async () => {
+  const query = `
+    SELECT
+      id_event as id,
+      title,
+      event_name,
+      description,
+      event_start_date as date,
+      final_delivery_date as end_date,
+      event_status as status,
+      event_type,
+      cohort,
+      route,
+      github_org,
+      max_team_size
+    FROM events
+    WHERE event_status = 'ACTIVE'
+    ORDER BY event_start_date ASC
+  `;
+  const result = await pool.query(query);
+  return result.rows;
+};
+
 export const findUpcoming = async (limit = 10) => {
   const query = `
     SELECT 
@@ -251,6 +274,7 @@ export const count = async ({ status }) => {
 export default {
   findAll,
   findById,
+  findActive,
   findUpcoming,
   findPast,
   create,

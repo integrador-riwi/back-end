@@ -5,12 +5,12 @@ import { asyncHandler } from "../../middleware/errorHandler.js";
 import { searchProjectByDescription } from "../../integrations/Google AI/searchService.js";
 
 export const create = asyncHandler(async (req, res) => {
-  const { name, description } = req.body;
+  const { name, description, idEvent } = req.body;
   const userId = req.user.id_user;
   const userRole = req.user.role;
 
   const team = await TeamsService.createTeam(
-    { name, description },
+    { name, description, idEvent },
     userId,
     userRole,
   );
@@ -19,9 +19,9 @@ export const create = asyncHandler(async (req, res) => {
 });
 
 export const list = asyncHandler(async (req, res) => {
-  const { search, page, limit } = req.query;
+  const { search, page, limit, idEvent } = req.query;
 
-  const result = await TeamsService.listTeams({ search, page, limit });
+  const result = await TeamsService.listTeams({ search, page, limit, idEvent });
 
   return success(res, result);
 });

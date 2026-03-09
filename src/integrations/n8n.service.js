@@ -14,6 +14,12 @@ const n8nService = {
       createdAt: new Date().toISOString(),
       collaboratorUsername: collaborator.githubUsername,
       collaboratorToken: collaborator.githubToken,
+      githubOrg: projectData.githubOrg ?? null,
+    });
+    console.log("[n8n] Payload enviado:", {
+      projectId: projectData.id,
+      name: projectData.name,
+      githubOrg: projectData.githubOrg
     });
 
     return response.data;
@@ -37,6 +43,7 @@ const n8nService = {
         memberEmail: member.email,
         memberName: member.name,
         role: member.role,
+        githubOrg: teamData.githubOrg ?? null,
       },
     );
 
