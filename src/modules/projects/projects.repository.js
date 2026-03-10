@@ -229,7 +229,7 @@ export const updateDeliverables = async (
   return result.rows[0] || null;
 };
 
-export const create = async (teamId, { name, description }) => {
+export const create = async (teamId, { name, description, idEvent = null }) => {
   const client = await pool.connect();
 
   try {
@@ -246,12 +246,17 @@ export const create = async (teamId, { name, description }) => {
     }
 
     const query = `
-      INSERT INTO projects (name, description, team_id)
-      VALUES ($1, $2, $3)
-      RETURNING id_project, name, description, team_id, repo_url, video_url, presentation_url, preview_photo_url, project_final_grade, submitted_at
+      INSERT INTO projects (name, description, team_id, id_event)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id_project, name, description, team_id, id_event, repo_url, video_url, presentation_url, preview_photo_url, project_final_grade, submitted_at
     `;
 
-    const result = await client.query(query, [name, description, teamId]);
+    const result = await client.query(query, [
+      name,
+      description,
+      teamId,
+      idEvent,
+    ]);
 
     await client.query("COMMIT");
 

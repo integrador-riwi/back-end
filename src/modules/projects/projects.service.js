@@ -243,9 +243,14 @@ export const createProject = async (teamId, data, userId, userRole) => {
     );
   }
 
+  // Fetch the team to get its id_event so the project is linked to the event
+  const team = await TeamsRepository.findById(teamId);
+  if (!team) throw new NotFoundError("Equipo no encontrado");
+
   const project = await ProjectsRepository.create(teamId, {
     name: data.name.trim(),
     description: data.description?.trim() || "",
+    idEvent: team.id_event ?? null,
   });
 
   const repoName = `project-${data.name.toLowerCase().replace(/\s+/g, "-")}`;
