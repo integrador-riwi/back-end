@@ -261,6 +261,14 @@ export const addMemberToTeam = async (teamId, memberData, userId, userRole) => {
     );
   }
 
+  // Block if project has been submitted
+  const project = await ProjectsRepository.findByTeamId(teamId);
+  if (project?.submitted_at) {
+    throw new ForbiddenError(
+      "El proyecto ya fue entregado. No se pueden agregar miembros.",
+    );
+  }
+
   if (!memberData.userId) {
     throw new ValidationError("El ID del usuario es requerido");
   }
@@ -370,6 +378,16 @@ export const removeMemberFromTeam = async (
     throw new ForbiddenError(
       "No tienes permiso para eliminar miembros de este equipo",
     );
+  }
+
+  // Block if project has been submitted (admins can still remove)
+  if (!isAdmin) {
+    const project = await ProjectsRepository.findByTeamId(teamId);
+    if (project?.submitted_at) {
+      throw new ForbiddenError(
+        "El proyecto ya fue entregado. No puedes salirte ni modificar el equipo.",
+      );
+    }
   }
 
   const memberWithGithub = await TeamsRepository.getMemberWithGithub(memberId);
