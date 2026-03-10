@@ -167,8 +167,11 @@ export const getTeamById = async (id, userId, userRole) => {
 
   const isMember = await TeamsRepository.isMember(id, userId);
   const isAdmin = userRole === "ADMIN";
+  const isTL = ["TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH"].includes(
+    userRole,
+  );
 
-  if (!isMember && !isAdmin) {
+  if (!isMember && !isAdmin && !isTL) {
     throw new ForbiddenError("No tienes acceso a este equipo");
   }
 
