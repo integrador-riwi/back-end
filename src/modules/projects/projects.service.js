@@ -139,21 +139,20 @@ export const updateDeliverables = async (id, data, userId, userRole) => {
 };
 
 export const submitProject = async (id, userId, userRole) => {
-  const project = await ProjectsRepository.findById(id);
+  const isAdmin = userRole === "ADMIN";
 
-  if (!project) {
+  // Single DB roundtrip: project data + leader check + github token
+  const row = await ProjectsRepository.findByIdWithLeaderGithub(id, userId);
+
+  if (!row) {
     throw new NotFoundError("Proyecto no encontrado");
   }
+
+  const { project, isLeader, leaderGithub } = row;
 
   if (project.submitted_at) {
     throw new ConflictError("El proyecto ya fue entregado anteriormente");
   }
-
-  const isLeader = await ProjectsRepository.isLeaderOfTeamByProjectId(
-    id,
-    userId,
-  );
-  const isAdmin = userRole === "ADMIN";
 
   if (!isLeader && !isAdmin) {
     throw new ForbiddenError(
@@ -174,25 +173,21 @@ export const submitProject = async (id, userId, userRole) => {
 
   const submitted = await ProjectsRepository.submitProject(id);
 
-  // Trigger n8n automation: make the GitHub repo public
+  // Trigger n8n: make the GitHub repo public (non-blocking)
   try {
-    const leaderWithGithub = await TeamsRepository.getMemberWithGithub(userId);
-
-    if (leaderWithGithub?.github_token) {
-      // Extract repo name from repo_url (last segment of the URL path)
+    if (leaderGithub?.github_token) {
       const repoName =
         project.repo_url?.split("/").filter(Boolean).pop() ?? null;
-
       await n8nService.triggerProjectSubmitted(
         {
           id: project.id_project,
           repoName,
           repoUrl: project.repo_url,
-          githubOrg: project.github_org ?? null,
+          githubOrg: null,
         },
         {
-          githubUsername: leaderWithGithub.github_username,
-          githubToken: leaderWithGithub.github_token,
+          githubUsername: leaderGithub.github_username,
+          githubToken: leaderGithub.github_token,
         },
       );
     } else {
@@ -201,7 +196,6 @@ export const submitProject = async (id, userId, userRole) => {
       );
     }
   } catch (err) {
-    // Don't fail the submit if the automation fails — log and continue
     console.error("[submitProject] n8n trigger failed:", err.message);
   }
 
