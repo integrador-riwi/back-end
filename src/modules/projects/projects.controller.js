@@ -1,6 +1,6 @@
-import ProjectsService from './projects.service.js';
-import { success, created } from '../../utils/response.js';
-import { asyncHandler } from '../../middleware/errorHandler.js';
+import ProjectsService from "./projects.service.js";
+import { success, created } from "../../utils/response.js";
+import { asyncHandler } from "../../middleware/errorHandler.js";
 
 export const list = asyncHandler(async (req, res) => {
   const { search, page, limit } = req.query;
@@ -25,7 +25,11 @@ export const getByTeam = asyncHandler(async (req, res) => {
   const userId = req.user.id_user;
   const userRole = req.user.role;
 
-  const project = await ProjectsService.getProjectByTeamId(id, userId, userRole);
+  const project = await ProjectsService.getProjectByTeamId(
+    id,
+    userId,
+    userRole,
+  );
 
   return success(res, project);
 });
@@ -40,7 +44,7 @@ export const update = asyncHandler(async (req, res) => {
     id,
     { name, description, repoUrl },
     userId,
-    userRole
+    userRole,
   );
 
   return success(res, project);
@@ -56,7 +60,7 @@ export const updateDeliverables = asyncHandler(async (req, res) => {
     id,
     { videoUrl, presentationUrl, previewPhotoUrl },
     userId,
-    userRole
+    userRole,
   );
 
   return success(res, project);
@@ -71,7 +75,7 @@ export const create = asyncHandler(async (req, res) => {
     teamId,
     { name, description },
     userId,
-    userRole
+    userRole,
   );
 
   return created(res, project);
@@ -87,10 +91,20 @@ export const confirmTeam = asyncHandler(async (req, res) => {
     id,
     { name, description },
     userId,
-    userRole
+    userRole,
   );
 
   return created(res, project);
+});
+
+export const submitProject = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id_user;
+  const userRole = req.user.role;
+
+  const project = await ProjectsService.submitProject(id, userId, userRole);
+
+  return success(res, project);
 });
 
 export default {
@@ -99,6 +113,7 @@ export default {
   getByTeam,
   update,
   updateDeliverables,
+  submitProject,
   create,
-  confirmTeam
+  confirmTeam,
 };
