@@ -172,7 +172,40 @@ export const submitProject = async (id, userId, userRole) => {
     );
   }
 
-  return ProjectsRepository.submitProject(id);
+  const submitted = await ProjectsRepository.submitProject(id);
+
+  // Trigger n8n automation: make the GitHub repo public
+  try {
+    const leaderWithGithub = await TeamsRepository.getMemberWithGithub(userId);
+
+    if (leaderWithGithub?.github_token) {
+      // Extract repo name from repo_url (last segment of the URL path)
+      const repoName =
+        project.repo_url?.split("/").filter(Boolean).pop() ?? null;
+
+      await n8nService.triggerProjectSubmitted(
+        {
+          id: project.id_project,
+          repoName,
+          repoUrl: project.repo_url,
+          githubOrg: project.github_org ?? null,
+        },
+        {
+          githubUsername: leaderWithGithub.github_username,
+          githubToken: leaderWithGithub.github_token,
+        },
+      );
+    } else {
+      console.warn(
+        `[submitProject] Leader ${userId} has no github_token — skipping repo visibility automation`,
+      );
+    }
+  } catch (err) {
+    // Don't fail the submit if the automation fails — log and continue
+    console.error("[submitProject] n8n trigger failed:", err.message);
+  }
+
+  return submitted;
 };
 
 function isValidUrl(string) {
