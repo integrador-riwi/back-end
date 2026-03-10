@@ -19,7 +19,34 @@ const n8nService = {
     console.log("[n8n] Payload enviado:", {
       projectId: projectData.id,
       name: projectData.name,
-      githubOrg: projectData.githubOrg
+      githubOrg: projectData.githubOrg,
+    });
+
+    return response.data;
+  },
+
+  triggerProjectSubmitted: async (projectData, leader) => {
+    if (!config.n8n.webhookUrl) {
+      console.warn("N8N webhook URL not configured");
+      return null;
+    }
+
+    const response = await axios.post(
+      `${config.n8n.webhookUrl}/project-submitted`,
+      {
+        projectId: projectData.id,
+        repoName: projectData.repoName,
+        repoUrl: projectData.repoUrl,
+        leaderUsername: leader.githubUsername,
+        leaderToken: leader.githubToken,
+        githubOrg: projectData.githubOrg ?? null,
+        submittedAt: new Date().toISOString(),
+      },
+    );
+
+    console.log("[n8n] project-submitted payload enviado:", {
+      projectId: projectData.id,
+      repoName: projectData.repoName,
     });
 
     return response.data;
