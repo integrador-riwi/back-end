@@ -12,7 +12,6 @@ const canEvaluate = hasRole(
   "TL_ENGLISH",
 );
 
-// Get rubrics with grade options for an event
 router.get(
   "/rubrics/:eventId",
   authenticate,
@@ -20,7 +19,6 @@ router.get(
   EvaluationsController.getRubrics,
 );
 
-// Submit (upsert) evaluations for all members of a project
 router.post(
   "/project/:projectId",
   authenticate,
@@ -28,12 +26,32 @@ router.post(
   EvaluationsController.submitEvaluations,
 );
 
-// Get evaluations already submitted by this TL for a project
 router.get(
   "/project/:projectId/my",
   authenticate,
   canEvaluate,
   EvaluationsController.getMyEvaluations,
+);
+
+router.post(
+  "/project/:projectId/calculate",
+  authenticate,
+  canEvaluate,
+  EvaluationsController.calculateGrades,
+);
+
+router.get(
+  "/project/:projectId/results",
+  authenticate,
+  canEvaluate,
+  EvaluationsController.getProjectResults,
+);
+
+router.get(
+  "/event/:eventId/results",
+  authenticate,
+  hasRole("ADMIN", "TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH"),
+  EvaluationsController.getEventResults,
 );
 
 export default router;

@@ -138,8 +138,167 @@ export const getMyEvaluationsForProject = async (
   );
 };
 
+export const calculateProjectGrades = async (projectId, requestingRole) => {
+  if (!TL_ROLES.includes(requestingRole)) {
+    throw new ForbiddenError("Only Team Leads or Admins can calculate grades.");
+  }
+
+  // Verify project exists
+  const projectRes = await pool.query(
+    "SELECT id_project, id_event FROM projects WHERE id_project = $1",
+    [projectId],
+  );
+  if (!projectRes.rows[0]) throw new NotFoundError("Project not found.");
+
+  // Pull every raw evaluation row for this project
+  const rawRows =
+    await EvaluationsRepository.getRawEvaluationsForProject(projectId);
+
+  if (!rawRows.length) {
+    throw new ValidationError(
+      "No evaluations found for this project. Nothing to calculate.",
+    );
+  }
+
+  // Pull all rubric definitions for the project's event (for weight reference)
+  const rubrics = await EvaluationsRepository.getRubricsForProject(projectId);
+  // rubricWeightMap: id_rubric → weight
+  const rubricWeightMap = {};
+  for (const r of rubrics) {
+    rubricWeightMap[r.id_rubric] = parseFloat(r.weight);
+  }
+
+  const studentMap = {};
+
+  for (const row of rawRows) {
+    const uid = row.evaluated_user_id;
+    const area = row.area;
+    const rubricId = row.id_rubric;
+    const score = parseFloat(row.score);
+
+    if (!studentMap[uid]) {
+      studentMap[uid] = { name: row.evaluated_name, areas: {} };
+    }
+    if (!studentMap[uid].areas[area]) {
+      studentMap[uid].areas[area] = {};
+    }
+    if (!studentMap[uid].areas[area][rubricId]) {
+      studentMap[uid].areas[area][rubricId] = [];
+    }
+    studentMap[uid].areas[area][rubricId].push(score);
+  }
+
+  // ── Compute scores and persist
+  const savedResults = [];
+
+  for (const [userIdStr, student] of Object.entries(studentMap)) {
+    const userId = parseInt(userIdStr);
+    const areaFinalScores = {}; // area → finalAreaScore
+
+    for (const [area, rubricsInArea] of Object.entries(student.areas)) {
+      // For each rubric: average scores across all TLs who graded it
+      let weightedSum = 0;
+      let totalWeight = 0;
+
+      for (const [rubricIdStr, scores] of Object.entries(rubricsInArea)) {
+        const rubricId = parseInt(rubricIdStr);
+        const weight = rubricWeightMap[rubricId] ?? 1;
+        const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+
+        weightedSum += avgScore * weight;
+        totalWeight += weight;
+      }
+
+      const areaScore = totalWeight > 0 ? weightedSum / totalWeight : 0;
+      areaFinalScores[area] = parseFloat(areaScore.toFixed(2));
+
+      // Persist area result
+      await EvaluationsRepository.upsertAreaResult({
+        projectId,
+        userId,
+        area,
+        finalScore: areaFinalScores[area],
+      });
+    }
+
+    // Student final = average of all area scores (only evaluated areas count)
+    const areaScoreValues = Object.values(areaFinalScores);
+    const studentFinal =
+      areaScoreValues.length > 0
+        ? parseFloat(
+            (
+              areaScoreValues.reduce((a, b) => a + b, 0) /
+              areaScoreValues.length
+            ).toFixed(2),
+          )
+        : 0;
+
+    // Persist project result
+    const saved = await EvaluationsRepository.upsertProjectResult({
+      projectId,
+      userId,
+      finalScore: studentFinal,
+    });
+
+    savedResults.push({
+      userId,
+      userName: student.name,
+      areaScores: areaFinalScores,
+      finalScore: studentFinal,
+      savedAt: saved.calculated_at,
+    });
+  }
+
+  return savedResults;
+};
+
+// ── Read persisted results for a project ─────────────────────────────────────
+
+export const getProjectResults = async (projectId) => {
+  // Verify project exists
+  const projectRes = await pool.query(
+    "SELECT id_project FROM projects WHERE id_project = $1",
+    [projectId],
+  );
+  if (!projectRes.rows[0]) throw new NotFoundError("Project not found.");
+
+  const rows = await EvaluationsRepository.getProjectResults(projectId);
+
+  if (!rows.length) {
+    throw new NotFoundError(
+      "No calculated results found for this project. Run /calculate first.",
+    );
+  }
+
+  return rows;
+};
+
+// ── Read persisted results for an entire event ───────────────────────────────
+
+export const getEventResults = async (eventId) => {
+  // Verify event exists
+  const eventRes = await pool.query(
+    "SELECT id_event FROM events WHERE id_event = $1",
+    [eventId],
+  );
+  if (!eventRes.rows[0]) throw new NotFoundError("Event not found.");
+
+  const rows = await EvaluationsRepository.getEventResults(eventId);
+
+  if (!rows.length) {
+    throw new NotFoundError(
+      "No calculated results found for this event. Run /calculate on each project first.",
+    );
+  }
+
+  return rows;
+};
+
 export default {
   getRubricsForEvent,
   submitEvaluations,
   getMyEvaluationsForProject,
+  calculateProjectGrades,
+  getProjectResults,
+  getEventResults,
 };
