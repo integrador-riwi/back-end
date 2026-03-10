@@ -8,7 +8,7 @@ import {
 
 const TL_ROLES = ["TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH", "ADMIN"];
 
-// Map TL role → evaluation area
+// Map TL role → evaluation area (ADMIN has no restriction → null)
 const ROLE_AREA_MAP = {
   TL_DEVELOPMENT: "DEVELOPMENT",
   TL_SOFT_SKILLS: "SOFT_SKILLS",
@@ -38,13 +38,16 @@ export const submitEvaluations = async ({
   projectId,
   evaluatorUserId,
   evaluatorRole,
-  evaluations, // [{ evaluatedUserId, rubricId, gradeId, feedback }]
+  evaluations, // [{ evaluatedUserId, gradeId, feedback }]
 }) => {
   if (!TL_ROLES.includes(evaluatorRole)) {
     throw new ForbiddenError("Only Team Leads can submit evaluations.");
   }
 
-  // Resolve eventId from project
+  // ADMINs can evaluate any area; TLs are restricted to their own area
+  const allowedArea = ROLE_AREA_MAP[evaluatorRole] ?? null;
+
+  // Resolve eventId from project in one query
   const projectRes = await pool.query(
     "SELECT id_event FROM projects WHERE id_project = $1",
     [projectId],
@@ -83,6 +86,13 @@ export const submitEvaluations = async ({
     if (!gradeRow) throw new NotFoundError(`Grade ${gradeId} not found.`);
 
     const area = gradeRow.area;
+
+    // Enforce area restriction: TLs can only evaluate their assigned area
+    if (allowedArea && area !== allowedArea) {
+      throw new ForbiddenError(
+        `As ${evaluatorRole} you can only evaluate the ${allowedArea} area, not ${area}.`,
+      );
+    }
 
     // Upsert: update if exists, insert if not
     const existing = await EvaluationsRepository.getExistingEvaluation({
