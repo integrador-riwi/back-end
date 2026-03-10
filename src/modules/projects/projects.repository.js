@@ -199,7 +199,7 @@ export const update = async (id, { name, description, repoUrl }) => {
       description = COALESCE($2, description),
       repo_url = COALESCE($3, repo_url)
     WHERE id_project = $4
-    RETURNING id_project, name, description, team_id, repo_url, video_url, presentation_url, preview_photo_url, project_final_grade
+    RETURNING id_project, name, description, team_id, repo_url, video_url, presentation_url, preview_photo_url, project_final_grade, submitted_at
   `;
 
   const result = await pool.query(query, [name, description, repoUrl, id]);
@@ -217,7 +217,7 @@ export const updateDeliverables = async (
       presentation_url = COALESCE($2, presentation_url),
       preview_photo_url = COALESCE($3, preview_photo_url)
     WHERE id_project = $4
-    RETURNING id_project, name, description, team_id, repo_url, video_url, presentation_url, preview_photo_url, project_final_grade
+    RETURNING id_project, name, description, team_id, repo_url, video_url, presentation_url, preview_photo_url, project_final_grade, submitted_at
   `;
 
   const result = await pool.query(query, [
@@ -248,7 +248,7 @@ export const create = async (teamId, { name, description }) => {
     const query = `
       INSERT INTO projects (name, description, team_id)
       VALUES ($1, $2, $3)
-      RETURNING id_project, name, description, team_id, repo_url, video_url, presentation_url, preview_photo_url, project_final_grade
+      RETURNING id_project, name, description, team_id, repo_url, video_url, presentation_url, preview_photo_url, project_final_grade, submitted_at
     `;
 
     const result = await client.query(query, [name, description, teamId]);
