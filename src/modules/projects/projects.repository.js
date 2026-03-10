@@ -132,6 +132,65 @@ export const findByTeamId = async (teamId) => {
   return result.rows[0] || null;
 };
 
+// Single query: project + leader identity check + github token
+// Replaces the triple roundtrip of findById + isLeaderOfTeamByProjectId + getMemberWithGithub
+export const findByIdWithLeaderGithub = async (projectId, userId) => {
+  const query = `
+    SELECT
+      p.id_project,
+      p.name,
+      p.description,
+      p.team_id,
+      p.id_event,
+      p.repo_url,
+      p.video_url,
+      p.presentation_url,
+      p.preview_photo_url,
+      p.submitted_at,
+      p.created_at,
+      t.name as team_name,
+      -- leader check: non-null only when userId IS the leader
+      tc.team_role,
+      u.id_user    as leader_id,
+      u.github_username,
+      u.github_token
+    FROM projects p
+    JOIN teams t ON p.team_id = t.id_team
+    LEFT JOIN team_coders tc
+      ON tc.id_team = t.id_team
+     AND tc.id_user = $2
+     AND tc.team_role = 'LEADER'
+    LEFT JOIN users u
+      ON u.id_user = tc.id_user
+    WHERE p.id_project = $1
+  `;
+
+  const result = await pool.query(query, [projectId, userId]);
+  if (!result.rows[0]) return null;
+
+  const row = result.rows[0];
+  return {
+    project: {
+      id_project: row.id_project,
+      name: row.name,
+      description: row.description,
+      team_id: row.team_id,
+      id_event: row.id_event,
+      repo_url: row.repo_url,
+      video_url: row.video_url,
+      presentation_url: row.presentation_url,
+      preview_photo_url: row.preview_photo_url,
+      submitted_at: row.submitted_at,
+      created_at: row.created_at,
+      team_name: row.team_name,
+    },
+    isLeader: row.team_role === "LEADER",
+    leaderGithub: row.leader_id
+      ? { github_username: row.github_username, github_token: row.github_token }
+      : null,
+  };
+};
+
 export const update = async (id, { name, description, repoUrl }) => {
   const query = `
     UPDATE projects
@@ -286,6 +345,7 @@ export default {
   findById,
   findByTeamId,
   findByTeamIdWithMembers,
+  findByIdWithLeaderGithub,
   create,
   update,
   updateDeliverables,
