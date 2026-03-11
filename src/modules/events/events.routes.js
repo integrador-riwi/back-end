@@ -20,6 +20,7 @@ router.get("/upcoming", authenticate, EventsController.getUpcoming);
 router.get("/active", authenticate, EventsController.getActive);
 router.get("/past", authenticate, EventsController.getPast);
 router.get("/stats", authenticate, isAdmin, EventsController.getStats);
+router.get("/:id/metrics", authenticate, isAdmin, EventsController.getMetrics);
 router.get("/:id", authenticate, EventsController.get);
 
 router.post("/", authenticate, canManage, EventsController.create);

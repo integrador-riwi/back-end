@@ -227,7 +227,6 @@ export const createRubric = async (
   return result.rows[0];
 };
 
-
 export const createRubricsWithGrades = async (eventId, rubrics) => {
   const client = await pool.connect();
   try {
@@ -270,7 +269,6 @@ export const createRubricsWithGrades = async (eventId, rubrics) => {
     client.release();
   }
 };
-
 
 export const getRubricsForEvent = async (eventId) => {
   const rubricRes = await pool.query(
@@ -353,4 +351,30 @@ export default {
   getRubricsForEvent,
   updateRubric,
   deactivateRubric,
+  getEventMetrics,
+};
+
+export const getEventMetrics = async (eventId) => {
+  const result = await pool.query(
+    `SELECT
+      (SELECT COUNT(*)            FROM teams      WHERE id_event = $1)                        AS total_teams,
+      (SELECT COUNT(*)            FROM projects   WHERE id_event = $1)                        AS total_projects,
+      (SELECT COUNT(DISTINCT tc.id_user)
+       FROM team_coders tc
+       JOIN teams t ON t.id_team = tc.id_team
+       WHERE t.id_event = $1)                                                                 AS total_coders,
+      (SELECT COUNT(*)
+       FROM public_votes pv
+       JOIN qr_votes qr ON qr.id_qr = pv.id_qr
+       WHERE qr.id_event = $1)                                                                AS total_votes,
+      (SELECT COUNT(DISTINCT e.project_id)
+       FROM evaluations e
+       JOIN projects p ON p.id_project = e.project_id
+       WHERE p.id_event = $1)                                                                 AS evaluated_projects,
+      (SELECT COUNT(DISTINCT r.area)
+       FROM rubrics r
+       WHERE r.id_event = $1 AND r.active = true)                                            AS active_areas`,
+    [eventId],
+  );
+  return result.rows[0];
 };

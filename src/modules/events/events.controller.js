@@ -151,6 +151,15 @@ export const deleteRubric = async (req, res, next) => {
   }
 };
 
+export const getMetrics = async (req, res, next) => {
+  try {
+    const metrics = await EventsService.getEventMetrics(req.params.id);
+    res.json({ success: true, data: metrics });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export default {
   list,
   get,
@@ -161,6 +170,7 @@ export default {
   update,
   remove,
   getStats,
+  getMetrics,
   getRubrics,
   addRubrics,
   updateRubric,

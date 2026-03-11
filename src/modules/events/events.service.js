@@ -95,6 +95,23 @@ export const getEventStats = async () => {
   return { total, upcoming, completed, inProgress };
 };
 
+export const getEventMetrics = async (eventId) => {
+  const event = await EventsRepository.findById(eventId);
+  if (!event) throw new NotFoundError("Evento no encontrado");
+  const metrics = await EventsRepository.getEventMetrics(eventId);
+  return {
+    eventId: parseInt(eventId),
+    eventTitle: event.title,
+    eventStatus: event.event_status,
+    totalTeams: parseInt(metrics.total_teams ?? 0),
+    totalProjects: parseInt(metrics.total_projects ?? 0),
+    totalCoders: parseInt(metrics.total_coders ?? 0),
+    totalVotes: parseInt(metrics.total_votes ?? 0),
+    evaluatedProjects: parseInt(metrics.evaluated_projects ?? 0),
+    activeAreas: parseInt(metrics.active_areas ?? 0),
+  };
+};
+
 export const getEventRubrics = async (eventId) => {
   const event = await EventsRepository.findById(eventId);
   if (!event) throw new NotFoundError("Evento no encontrado");
