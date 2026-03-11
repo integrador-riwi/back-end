@@ -30,6 +30,7 @@ router.get("/github/url", authenticate, AuthController.githubAuthUrl);
 router.get("/github/callback", AuthController.githubCallback);
 
 router.get("/github/status", authenticate, AuthController.getGithubStatus);
+router.get("/github/orgs", authenticate, AuthController.getGithubOrgs);
 
 router.delete("/github", authenticate, AuthController.disconnectGithub);
 

@@ -1,4 +1,5 @@
 import * as EventsRepository from "./events.repository.js";
+import { getMemberWithGithub } from "../teams/teams.repository.js";
 import {
   NotFoundError,
   ValidationError,
@@ -28,6 +29,14 @@ export const createEvent = async (eventData, creatorUser) => {
   if (!eventData.title || !eventData.eventDate) {
     throw new ValidationError(
       "El título y la fecha del evento son obligatorios",
+    );
+  }
+
+  // Require GitHub connection to create an event
+  const creatorWithGithub = await getMemberWithGithub(creatorUser.id_user);
+  if (!creatorWithGithub?.github_username) {
+    throw new ValidationError(
+      "Debes tener tu cuenta de GitHub conectada para crear un evento.",
     );
   }
 

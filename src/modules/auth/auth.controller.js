@@ -193,6 +193,12 @@ export const disconnectGithub = asyncHandler(async (req, res) => {
   return success(res, result);
 });
 
+export const getGithubOrgs = asyncHandler(async (req, res) => {
+  const userId = req.user.id_user;
+  const result = await AuthService.getGithubOrgs(userId);
+  return success(res, result);
+});
+
 export default {
   register,
   login,
@@ -206,4 +212,5 @@ export default {
   githubCallback,
   getGithubStatus,
   disconnectGithub,
+  getGithubOrgs,
 };

@@ -364,6 +364,24 @@ export const disconnectGithub = async (userId) => {
   return { message: "GitHub account disconnected successfully" };
 };
 
+export const getGithubOrgs = async (userId) => {
+  const user = await AuthRepository.findById(userId);
+  if (!user) throw new NotFoundError("User not found.");
+  if (!user.github_token) {
+    throw new ValidationError(
+      "No tienes GitHub conectado. Conecta tu cuenta primero.",
+    );
+  }
+  try {
+    const orgs = await GitHubService.getUserOrgs(user.github_token);
+    return { connected: true, username: user.github_username, orgs };
+  } catch (err) {
+    throw new ValidationError(
+      "No se pudieron obtener las organizaciones de GitHub. Tu token puede haber expirado.",
+    );
+  }
+};
+
 export default {
   register,
   login,
@@ -376,4 +394,5 @@ export default {
   handleGithubCallback,
   getGithubConnection,
   disconnectGithub,
+  getGithubOrgs,
 };
