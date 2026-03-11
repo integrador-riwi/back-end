@@ -14,7 +14,7 @@ export const findByEmail = async (email) => {
 
 export const findById = async (id_user) => {
   const query =
-    "SELECT id_user, name, email, role, encrypted_password, document_number, document_type, clan, is_active, github_avatar_url FROM users WHERE id_user = $1";
+    "SELECT id_user, name, email, role, encrypted_password, document_number, document_type, clan, is_active, github_avatar_url, github_token, github_username FROM users WHERE id_user = $1";
   const result = await pool.query(query, [id_user]);
   return result.rows[0] || null;
 };
