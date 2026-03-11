@@ -106,31 +106,16 @@ export const submitEvaluations = async ({
       );
     }
 
-    // Upsert: update if exists, insert if not
-    const existing = await EvaluationsRepository.getExistingEvaluation({
+    // Upsert: one query handles both insert and update
+    const saved = await EvaluationsRepository.upsertEvaluation({
       projectId,
+      eventId,
       evaluatorUserId,
       evaluatedUserId,
       area,
+      feedback,
+      gradeId,
     });
-
-    let saved;
-    if (existing) {
-      saved = await EvaluationsRepository.updateEvaluation(
-        existing.id_evaluation,
-        { feedback, gradeId },
-      );
-    } else {
-      saved = await EvaluationsRepository.createEvaluation({
-        projectId,
-        eventId,
-        evaluatorUserId,
-        evaluatedUserId,
-        area,
-        feedback,
-        gradeId,
-      });
-    }
 
     results.push(saved);
   }

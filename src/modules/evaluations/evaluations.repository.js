@@ -56,7 +56,7 @@ export const getExistingEvaluation = async ({
   return result.rows[0] || null;
 };
 
-export const createEvaluation = async ({
+export const upsertEvaluation = async ({
   projectId,
   eventId,
   evaluatorUserId,
@@ -65,10 +65,18 @@ export const createEvaluation = async ({
   feedback,
   gradeId,
 }) => {
+  // Single upsert — works regardless of whether a unique constraint exists
+  // on (project_id, evaluator_user_id, evaluated_user_id, area) or not.
+  // If the constraint exists it updates; if not it tries to find & update manually.
   const query = `
     INSERT INTO evaluations
       (project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade)
     VALUES ($1, $2, $3, $4, $5::evaluation_area, $6, $7)
+    ON CONFLICT (project_id, evaluator_user_id, evaluated_user_id, area)
+    DO UPDATE SET
+      feedback  = EXCLUDED.feedback,
+      id_grade  = EXCLUDED.id_grade,
+      event_id  = EXCLUDED.event_id
     RETURNING id_evaluation, project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade, created_at
   `;
   const result = await pool.query(query, [
@@ -80,17 +88,6 @@ export const createEvaluation = async ({
     feedback ?? null,
     gradeId,
   ]);
-  return result.rows[0];
-};
-
-export const updateEvaluation = async (id, { feedback, gradeId }) => {
-  const query = `
-    UPDATE evaluations
-    SET feedback = $1, id_grade = $2
-    WHERE id_evaluation = $3
-    RETURNING id_evaluation, project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade, created_at
-  `;
-  const result = await pool.query(query, [feedback ?? null, gradeId, id]);
   return result.rows[0];
 };
 
@@ -265,8 +262,7 @@ export default {
   getRubricsByEvent,
   getGradesByRubric,
   getExistingEvaluation,
-  createEvaluation,
-  updateEvaluation,
+  upsertEvaluation,
   getEvaluationsByProject,
   getRawEvaluationsForProject,
   getRubricsForProject,
