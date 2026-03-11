@@ -16,6 +16,7 @@ const EVENT_SELECT = `
   cohort,
   route,
   github_org,
+  github_org_token,
   max_team_size,
   target_clans,
   created_by
@@ -136,6 +137,7 @@ export const create = async ({
   cohort,
   route,
   githubOrg = null,
+  githubOrgToken = null,
   maxTeamSize = 5,
   targetClans = null,
   createdBy = null,
@@ -143,9 +145,9 @@ export const create = async ({
   const result = await pool.query(
     `INSERT INTO events
        (title, event_name, description, event_start_date, final_delivery_date,
-        event_status, status, event_type, cohort, route, github_org, max_team_size,
+        event_status, status, event_type, cohort, route, github_org, github_org_token, max_team_size,
         target_clans, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
      RETURNING ${EVENT_SELECT}`,
     [
       title,
@@ -159,8 +161,9 @@ export const create = async ({
       cohort,
       route,
       githubOrg,
+      githubOrgToken,
       maxTeamSize,
-      targetClans, // null = todos los clanes
+      targetClans,
       createdBy,
     ],
   );

@@ -70,6 +70,7 @@ export const createEvent = async (eventData, creatorUser) => {
     cohort: eventData.cohort,
     route: eventData.route,
     githubOrg: eventData.githubOrg ?? null,
+    githubOrgToken: creatorWithGithub.github_token ?? null,
     maxTeamSize: eventData.maxTeamSize ?? 5,
     targetClans,
     createdBy: creatorUser.id_user,

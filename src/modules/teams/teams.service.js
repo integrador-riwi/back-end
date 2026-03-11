@@ -68,6 +68,7 @@ export const createTeam = async (
 
     // Fetch event to get githubOrg if provided
     let githubOrg = null;
+    let githubOrgToken = null;
     console.log("[createTeam] data.idEvent:", data.idEvent);
     if (data.idEvent) {
       try {
@@ -75,6 +76,7 @@ export const createTeam = async (
           await import("../events/events.repository.js");
         const event = await findEvent(data.idEvent);
         githubOrg = event?.github_org ?? null;
+        githubOrgToken = event?.github_org_token ?? null;
         console.log("[createTeam] event:", event);
         console.log("[createTeam] githubOrg:", githubOrg);
       } catch (_) {}
@@ -88,7 +90,7 @@ export const createTeam = async (
       },
       {
         githubUsername: leaderWithGithub.github_username,
-        githubToken: leaderWithGithub.github_token,
+        githubToken: githubOrgToken ?? leaderWithGithub.github_token,
       },
     );
 
