@@ -98,7 +98,7 @@ export const findById = async (id) => {
 
 export const findActive = async () => {
   const result = await pool.query(
-    `SELECT ${EVENT_SELECT} FROM events WHERE event_status = 'ACTIVE' ORDER BY event_start_date ASC`,
+    `SELECT ${EVENT_SELECT} FROM events WHERE event_status = 'IN_PROGRESS' ORDER BY event_start_date ASC`,
   );
   return result.rows;
 };
