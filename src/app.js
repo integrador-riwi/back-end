@@ -13,7 +13,7 @@ import config from "./config/env.js";
 import githubWebhookRouter from "./integrations/github.webhook.js";
 import emailRoutes from "./utils/emails/emails.routes.js";
 import votesRoutes from "./modules/QR-Votes/votes.routes.js";
-import {join} from "path";
+import { join } from "path";
 
 const app = express();
 
@@ -26,24 +26,31 @@ const allowedOrigins = [
   "https://front-end-integrador-zatc.onrender.com",
 ];
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("No permitido por CORS"));
-      }
-    },
-    credentials: true,
-  }),
-);
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("No permitido por CORS"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
+};
 
-app.use("/api/webhooks", githubWebhookRouter);
+// Handle preflight requests for ALL routes before anything else
+app.options("*", cors(corsOptions));
+app.use(cors(corsOptions));
 
+// Body parsers — must come before route handlers (webhook has its own raw parser internally)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// Webhook needs raw body for signature verification — registered after global parsers
+// so that express.raw() inside only affects /api/webhooks/* traffic
+app.use("/api/webhooks", githubWebhookRouter);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", environment: config.nodeEnv });
@@ -61,7 +68,7 @@ app.use("/api/evaluations", evaluationsRoutes);
 app.use("/api/emails", emailRoutes);
 
 // Endpoint to manage QR Votes
-app.use('/api/qr-votes', votesRoutes);
+app.use("/api/qr-votes", votesRoutes);
 
 // Endpoint to show the public page where external users can vote
 // app.get('/vote/:eventId', (req, res) => {
