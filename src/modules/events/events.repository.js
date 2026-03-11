@@ -16,14 +16,22 @@ const EVENT_SELECT = `
   cohort,
   route,
   github_org,
-  max_team_size
+  max_team_size,
+  target_clans,
+  created_by
 `;
 
 // ─────────────────────────────────────────────────────────────
 // Events CRUD
 // ─────────────────────────────────────────────────────────────
 
-export const findAll = async ({ status, search, page = 1, limit = 10 }) => {
+export const findAll = async ({
+  status,
+  search,
+  clan,
+  page = 1,
+  limit = 10,
+}) => {
   const whereClauses = [];
   const params = [];
   let paramIndex = 1;
@@ -39,6 +47,14 @@ export const findAll = async ({ status, search, page = 1, limit = 10 }) => {
     );
     params.push(`%${search}%`);
     paramIndex++;
+  }
+
+  // Filter by clan: show events that target this clan OR target all (NULL)
+  if (clan) {
+    whereClauses.push(
+      `(target_clans IS NULL OR $${paramIndex++} = ANY(target_clans))`,
+    );
+    params.push(clan);
   }
 
   const whereClause =
@@ -121,12 +137,15 @@ export const create = async ({
   route,
   githubOrg = null,
   maxTeamSize = 5,
+  targetClans = null,
+  createdBy = null,
 }) => {
   const result = await pool.query(
     `INSERT INTO events
        (title, event_name, description, event_start_date, final_delivery_date,
-        event_status, status, event_type, cohort, route, github_org, max_team_size)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        event_status, status, event_type, cohort, route, github_org, max_team_size,
+        target_clans, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
      RETURNING ${EVENT_SELECT}`,
     [
       title,
@@ -141,6 +160,8 @@ export const create = async ({
       route,
       githubOrg,
       maxTeamSize,
+      targetClans, // null = todos los clanes
+      createdBy,
     ],
   );
   return result.rows[0];
@@ -159,8 +180,13 @@ export const update = async (
     route,
     githubOrg = null,
     maxTeamSize = null,
+    targetClans, // undefined = don't touch, null = all clans, array = specific clans
   },
 ) => {
+  // target_clans needs special handling: COALESCE won't let us set it back to NULL
+  const hasTargetClans = targetClans !== undefined;
+  const targetClansExpr = hasTargetClans ? `$12` : `target_clans`;
+
   const result = await pool.query(
     `UPDATE events
      SET
@@ -176,6 +202,7 @@ export const update = async (
        route              = COALESCE($8,  route),
        github_org         = COALESCE($9,  github_org),
        max_team_size      = COALESCE($10, max_team_size),
+       target_clans       = ${targetClansExpr},
        updated_at         = NOW()
      WHERE id_event = $11
      RETURNING ${EVENT_SELECT}`,
@@ -191,6 +218,7 @@ export const update = async (
       githubOrg,
       maxTeamSize,
       id,
+      ...(hasTargetClans ? [targetClans] : []),
     ],
   );
   return result.rows[0] || null;
