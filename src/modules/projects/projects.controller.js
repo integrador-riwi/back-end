@@ -52,13 +52,13 @@ export const update = asyncHandler(async (req, res) => {
 
 export const updateDeliverables = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { videoUrl, presentationUrl, previewPhotoUrl } = req.body;
+  const { videoUrl, presentationUrl, previewPhotoUrl, deployUrl } = req.body;
   const userId = req.user.id_user;
   const userRole = req.user.role;
 
   const project = await ProjectsService.updateDeliverables(
     id,
-    { videoUrl, presentationUrl, previewPhotoUrl },
+    { videoUrl, presentationUrl, previewPhotoUrl, deployUrl },
     userId,
     userRole,
   );

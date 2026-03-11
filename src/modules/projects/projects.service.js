@@ -129,10 +129,17 @@ export const updateDeliverables = async (id, data, userId, userRole) => {
     }
   }
 
+  if (data.deployUrl !== undefined) {
+    if (data.deployUrl && !isValidUrl(data.deployUrl)) {
+      throw new ValidationError("La URL del deploy no es válida");
+    }
+  }
+
   const updatedProject = await ProjectsRepository.updateDeliverables(id, {
     videoUrl: data.videoUrl,
     presentationUrl: data.presentationUrl,
     previewPhotoUrl: data.previewPhotoUrl,
+    deployUrl: data.deployUrl,
   });
 
   return updatedProject;
@@ -164,6 +171,7 @@ export const submitProject = async (id, userId, userRole) => {
   if (!project.video_url) missingFields.push("Pitch Video");
   if (!project.preview_photo_url) missingFields.push("Preview Photo");
   if (!project.repo_url) missingFields.push("Repository");
+  if (!project.deploy_url) missingFields.push("Deploy Link");
 
   if (missingFields.length > 0) {
     throw new ValidationError(

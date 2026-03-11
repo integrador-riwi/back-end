@@ -44,6 +44,7 @@ export const findAll = async ({ search = null, page = 1, limit = 10 }) => {
       p.video_url,
       p.presentation_url,
       p.preview_photo_url,
+      p.deploy_url,
       p.created_at,
       t.name as team_name,
       u.name as leader_name,
@@ -89,6 +90,7 @@ export const findById = async (id) => {
       p.video_url,
       p.presentation_url,
       p.preview_photo_url,
+      p.deploy_url,
       p.submitted_at,
       p.created_at,
       t.name as team_name,
@@ -120,6 +122,7 @@ export const findByTeamId = async (teamId) => {
       p.video_url,
       p.presentation_url,
       p.preview_photo_url,
+      p.deploy_url,
       p.submitted_at,
       p.created_at,
       t.name as team_name
@@ -146,6 +149,7 @@ export const findByIdWithLeaderGithub = async (projectId, userId) => {
       p.video_url,
       p.presentation_url,
       p.preview_photo_url,
+      p.deploy_url,
       p.submitted_at,
       p.created_at,
       t.name as team_name,
@@ -180,6 +184,7 @@ export const findByIdWithLeaderGithub = async (projectId, userId) => {
       video_url: row.video_url,
       presentation_url: row.presentation_url,
       preview_photo_url: row.preview_photo_url,
+      deploy_url: row.deploy_url,
       submitted_at: row.submitted_at,
       created_at: row.created_at,
       team_name: row.team_name,
@@ -208,22 +213,24 @@ export const update = async (id, { name, description, repoUrl }) => {
 
 export const updateDeliverables = async (
   id,
-  { videoUrl, presentationUrl, previewPhotoUrl },
+  { videoUrl, presentationUrl, previewPhotoUrl, deployUrl },
 ) => {
   const query = `
     UPDATE projects
     SET 
       video_url = COALESCE($1, video_url),
       presentation_url = COALESCE($2, presentation_url),
-      preview_photo_url = COALESCE($3, preview_photo_url)
-    WHERE id_project = $4
-    RETURNING id_project, name, description, team_id, repo_url, video_url, presentation_url, preview_photo_url, project_final_grade, submitted_at
+      preview_photo_url = COALESCE($3, preview_photo_url),
+      deploy_url = COALESCE($4, deploy_url)
+    WHERE id_project = $5
+    RETURNING id_project, name, description, team_id, repo_url, video_url, presentation_url, preview_photo_url, deploy_url, project_final_grade, submitted_at
   `;
 
   const result = await pool.query(query, [
     videoUrl,
     presentationUrl,
     previewPhotoUrl,
+    deployUrl,
     id,
   ]);
   return result.rows[0] || null;
