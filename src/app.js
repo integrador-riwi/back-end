@@ -12,6 +12,8 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import config from "./config/env.js";
 import githubWebhookRouter from "./integrations/github.webhook.js";
 import emailRoutes from "./utils/emails/emails.routes.js";
+import votesRoutes from "./modules/QR-Votes/votes.routes.js";
+import {join} from "path";
 
 const app = express();
 
@@ -57,6 +59,14 @@ app.use("/api/evaluations", evaluationsRoutes);
 
 // Endpoint to send emails
 app.use("/api/emails", emailRoutes);
+
+// Endpoint to manage QR Votes
+app.use('/api/qr-votes', votesRoutes);
+
+// Endpoint to show the public page where external users can vote
+// app.get('/vote/:eventId', (req, res) => {
+//   res.sendFile(join(__dirname, 'public', 'vote.html'));
+// });
 
 app.use((req, res) => {
   res.status(404).json({ success: false, error: "Endpoint no encontrado" });
