@@ -348,7 +348,7 @@ export const getEventMetrics = async (eventId) => {
        WHERE t.id_event = $1)                                           AS total_coders,
       (SELECT COUNT(*)
        FROM public_votes pv
-       JOIN qr_votes qr ON qr.id_qr = pv.id_qr
+       JOIN qr_votes qr ON qr.id = pv.qr_vote_id
        WHERE qr.id_event = $1)                                          AS total_votes,
       (SELECT COUNT(DISTINCT e.project_id)
        FROM evaluations e
