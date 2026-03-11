@@ -47,17 +47,29 @@ export const submitEvaluations = async ({
   // ADMINs can evaluate any area; TLs are restricted to their own area
   const allowedArea = ROLE_AREA_MAP[evaluatorRole] ?? null;
 
-  // Resolve eventId from project in one query
+  // Resolve eventId from project — if missing, fall back to the team's event
   const projectRes = await pool.query(
-    "SELECT id_event FROM projects WHERE id_project = $1",
+    `SELECT p.id_event, p.team_id, t.id_event AS team_event_id
+     FROM projects p
+     JOIN teams t ON t.id_team = p.team_id
+     WHERE p.id_project = $1`,
     [projectId],
   );
   const project = projectRes.rows[0];
   if (!project) throw new NotFoundError("Project not found.");
-  if (!project.id_event)
-    throw new ValidationError("This project is not linked to an event.");
 
-  const eventId = project.id_event;
+  // Auto-heal: if project.id_event is null but the team has one, link them now
+  let eventId = project.id_event;
+  if (!eventId && project.team_event_id) {
+    await pool.query(
+      "UPDATE projects SET id_event = $1 WHERE id_project = $2",
+      [project.team_event_id, projectId],
+    );
+    eventId = project.team_event_id;
+  }
+
+  if (!eventId)
+    throw new ValidationError("This project is not linked to an event.");
 
   if (!Array.isArray(evaluations) || evaluations.length === 0) {
     throw new ValidationError("You must provide at least one evaluation.");
@@ -143,12 +155,23 @@ export const calculateProjectGrades = async (projectId, requestingRole) => {
     throw new ForbiddenError("Only Team Leads or Admins can calculate grades.");
   }
 
-  // Verify project exists
+  // Verify project exists and auto-heal missing id_event
   const projectRes = await pool.query(
-    "SELECT id_project, id_event FROM projects WHERE id_project = $1",
+    `SELECT p.id_project, p.id_event, t.id_event AS team_event_id
+     FROM projects p
+     JOIN teams t ON t.id_team = p.team_id
+     WHERE p.id_project = $1`,
     [projectId],
   );
   if (!projectRes.rows[0]) throw new NotFoundError("Project not found.");
+
+  const projectRow = projectRes.rows[0];
+  if (!projectRow.id_event && projectRow.team_event_id) {
+    await pool.query(
+      "UPDATE projects SET id_event = $1 WHERE id_project = $2",
+      [projectRow.team_event_id, projectId],
+    );
+  }
 
   // Pull every raw evaluation row for this project
   const rawRows =
