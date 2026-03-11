@@ -58,7 +58,7 @@ export const getPast = async (req, res, next) => {
 
 export const create = async (req, res, next) => {
   try {
-    const event = await EventsService.createEvent(req.body);
+    const event = await EventsService.createEvent(req.body, req.user);
     res.status(201).json({
       success: true,
       data: event,
@@ -71,7 +71,11 @@ export const create = async (req, res, next) => {
 
 export const update = async (req, res, next) => {
   try {
-    const event = await EventsService.updateEvent(req.params.id, req.body);
+    const event = await EventsService.updateEvent(
+      req.params.id,
+      req.body,
+      req.user,
+    );
     res.json({
       success: true,
       data: event,
@@ -84,7 +88,7 @@ export const update = async (req, res, next) => {
 
 export const remove = async (req, res, next) => {
   try {
-    await EventsService.deleteEvent(req.params.id);
+    await EventsService.deleteEvent(req.params.id, req.user);
     res.json({
       success: true,
       data: null,
