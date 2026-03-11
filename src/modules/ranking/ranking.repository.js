@@ -27,23 +27,28 @@ export const getEventEvaluationStatus = async (eventId) => {
     ),
     project_coverage AS (
       -- For each project, count how many required areas are covered
+      -- LEFT JOIN required_areas so projects still appear even if no rubrics defined
       SELECT
         p.id_project,
         p.name              AS project_name,
         t.name              AS team_name,
         t.id_team,
-        (SELECT COUNT(*) FROM required_areas)                   AS required_area_count,
-        COUNT(DISTINCT pea.area)                                AS evaluated_area_count,
-        -- true only when every required area has at least 1 evaluation
-        BOOL_AND(
-          EXISTS (
-            SELECT 1 FROM project_evaluated_areas pea2
-            WHERE pea2.id_project = p.id_project AND pea2.area = ra.area
+        (SELECT COUNT(*) FROM required_areas)  AS required_area_count,
+        COUNT(DISTINCT pea.area)               AS evaluated_area_count,
+        -- fully_evaluated = true when every required area has at least 1 evaluation
+        -- if there are no required areas, treat as not fully evaluated
+        CASE
+          WHEN (SELECT COUNT(*) FROM required_areas) = 0 THEN false
+          ELSE BOOL_AND(
+            ra.area IS NULL OR EXISTS (
+              SELECT 1 FROM project_evaluated_areas pea2
+              WHERE pea2.id_project = p.id_project AND pea2.area = ra.area
+            )
           )
-        ) AS fully_evaluated
+        END AS fully_evaluated
       FROM projects p
       JOIN teams t ON t.id_team = p.team_id
-      CROSS JOIN required_areas ra
+      LEFT JOIN required_areas ra ON true
       LEFT JOIN project_evaluated_areas pea ON pea.id_project = p.id_project
       WHERE p.id_event = $1
       GROUP BY p.id_project, p.name, t.name, t.id_team
