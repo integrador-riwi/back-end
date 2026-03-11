@@ -86,6 +86,7 @@ const n8nService = {
         memberUsername: member.githubUsername,
         memberEmail: member.email,
         memberName: member.name,
+        githubOrg: teamData.githubOrg ?? null,
       },
     );
 

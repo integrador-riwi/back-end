@@ -413,10 +413,12 @@ export const removeMemberFromTeam = async (
     const teamProject = await TeamsRepository.getTeamProject(teamId);
 
     if (memberWithGithub && leaderWithGithub && teamProject) {
+      const githubOrgRemove = await TeamsRepository.getTeamGithubOrg(teamId);
       await n8nService.triggerMemberRemoved(
         {
           repoName: teamProject.repo_name,
           leaderGithubUsername: leaderWithGithub.github_username,
+          githubOrg: githubOrgRemove,
         },
         {
           githubUsername: memberWithGithub.github_username,
