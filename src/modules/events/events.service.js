@@ -24,7 +24,7 @@ export const getUpcomingEvents = async (limit) =>
 
 export const getPastEvents = async (limit) => EventsRepository.findPast(limit);
 
-export const createEvent = async (eventData) => {
+export const createEvent = async (eventData, creatorUser) => {
   if (!eventData.title || !eventData.eventDate) {
     throw new ValidationError(
       "El título y la fecha del evento son obligatorios",
@@ -34,6 +34,9 @@ export const createEvent = async (eventData) => {
   // Validate rubrics if provided
   const rubrics = eventData.rubrics ?? [];
   _validateRubrics(rubrics);
+
+  // Resolve targetClans: null means all clans
+  const targetClans = _resolveTargetClans(eventData.targetClans);
 
   // 1. Create the event
   const event = await EventsRepository.create({
@@ -47,6 +50,8 @@ export const createEvent = async (eventData) => {
     route: eventData.route,
     githubOrg: eventData.githubOrg ?? null,
     maxTeamSize: eventData.maxTeamSize ?? 5,
+    targetClans,
+    createdBy: creatorUser.id_user,
   });
 
   // 2. Create rubrics if any were provided
@@ -61,9 +66,23 @@ export const createEvent = async (eventData) => {
   return { ...event, rubrics: savedRubrics };
 };
 
-export const updateEvent = async (id, eventData) => {
+export const updateEvent = async (id, eventData, requestingUser) => {
   const existingEvent = await EventsRepository.findById(id);
   if (!existingEvent) throw new NotFoundError("Evento no encontrado");
+
+  // Ownership check: TLs can only edit events they created; ADMINs can edit any
+  if (requestingUser.role !== "ADMIN") {
+    if (existingEvent.created_by !== requestingUser.id_user) {
+      throw new ForbiddenError(
+        "Solo puedes editar los eventos que tú creaste.",
+      );
+    }
+  }
+
+  const targetClans =
+    eventData.targetClans !== undefined
+      ? _resolveTargetClans(eventData.targetClans)
+      : undefined; // undefined = don't touch the column
 
   return EventsRepository.update(id, {
     title: eventData.title,
@@ -76,14 +95,37 @@ export const updateEvent = async (id, eventData) => {
     route: eventData.route,
     githubOrg: eventData.githubOrg ?? null,
     maxTeamSize: eventData.maxTeamSize ?? null,
+    targetClans,
   });
 };
 
-export const deleteEvent = async (id) => {
+export const deleteEvent = async (id, requestingUser) => {
   const existingEvent = await EventsRepository.findById(id);
   if (!existingEvent) throw new NotFoundError("Evento no encontrado");
+
+  // Only ADMIN can delete events
+  if (requestingUser.role !== "ADMIN") {
+    throw new ForbiddenError("Solo un administrador puede eliminar eventos.");
+  }
+
   return EventsRepository.remove(id);
 };
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Normalizes targetClans input:
+ *   - null / undefined / [] / "ALL"  → null  (all clans)
+ *   - ["GOSLING", "LINUS"]           → ["GOSLING", "LINUS"]
+ */
+function _resolveTargetClans(value) {
+  if (!value || value === "ALL") return null;
+  if (Array.isArray(value)) {
+    const cleaned = value.map((c) => c.trim().toUpperCase()).filter(Boolean);
+    return cleaned.length > 0 ? cleaned : null;
+  }
+  return null;
+}
 
 export const getEventStats = async () => {
   const [total, upcoming, completed, inProgress] = await Promise.all([
