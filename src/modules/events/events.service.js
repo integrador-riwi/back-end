@@ -47,13 +47,25 @@ export const createEvent = async (eventData, creatorUser) => {
   // Resolve targetClans: null means all clans
   const targetClans = _resolveTargetClans(eventData.targetClans);
 
+  // Derive status from dates if not explicitly provided
+  const resolvedStatus = (() => {
+    if (eventData.status && eventData.status !== "UPCOMING")
+      return eventData.status;
+    const now = new Date();
+    const start = eventData.eventDate ? new Date(eventData.eventDate) : null;
+    const end = eventData.endDate ? new Date(eventData.endDate) : null;
+    if (end && now > end) return "COMPLETED";
+    if (start && now >= start) return "IN_PROGRESS";
+    return "UPCOMING";
+  })();
+
   // 1. Create the event
   const event = await EventsRepository.create({
     title: eventData.title,
     description: eventData.description,
     eventDate: eventData.eventDate,
     endDate: eventData.endDate,
-    status: eventData.status || "UPCOMING",
+    status: resolvedStatus,
     eventType: eventData.eventType || "CAPSTONE",
     cohort: eventData.cohort,
     route: eventData.route,
