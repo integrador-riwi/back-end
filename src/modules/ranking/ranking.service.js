@@ -7,23 +7,6 @@ import {
   ForbiddenError,
 } from "../../middleware/errorHandler.js";
 
-// ─────────────────────────────────────────────────────────────
-// Ranking status — tells the admin whether conditions are met
-// ─────────────────────────────────────────────────────────────
-
-/**
- * Returns a detailed status object:
- * {
- *   eventId, eventStatus, deliveryDate,
- *   isDeadlinePassed,        — final_delivery_date < now
- *   requiredAreas,           — areas with active rubrics
- *   totalProjects,
- *   fullyEvaluatedProjects,  — projects covered in ALL required areas
- *   allProjectsEvaluated,    — boolean
- *   canPublish,              — isDeadlinePassed && allProjectsEvaluated
- *   projects: [{ id, name, team, fullyEvaluated, evaluatedAreas, requiredAreaCount }]
- * }
- */
 export const getRankingStatus = async (eventId) => {
   const eventRes = await pool.query(
     `SELECT id_event, event_status, final_delivery_date FROM events WHERE id_event = $1`,
@@ -34,27 +17,27 @@ export const getRankingStatus = async (eventId) => {
   const event = eventRes.rows[0];
   const rows = await RankingRepository.getEventEvaluationStatus(eventId);
 
+  const isDeadlinePassed = event.final_delivery_date
+    ? new Date(event.final_delivery_date) < new Date()
+    : false;
+
   if (!rows.length) {
     return {
       eventId: parseInt(eventId),
       eventStatus: event.event_status,
       deliveryDate: event.final_delivery_date,
-      isDeadlinePassed: event.final_delivery_date
-        ? new Date(event.final_delivery_date) < new Date()
-        : false,
+      isDeadlinePassed,
       requiredAreas: [],
       totalProjects: 0,
       fullyEvaluatedProjects: 0,
       allProjectsEvaluated: false,
-      canPublish: false,
+      hasIncompleteEvaluations: false,
+      canPublish: isDeadlinePassed,
       projects: [],
     };
   }
 
   const requiredAreas = rows[0].required_areas ?? [];
-  const isDeadlinePassed = event.final_delivery_date
-    ? new Date(event.final_delivery_date) < new Date()
-    : false;
 
   const projects = rows.map((r) => ({
     id: r.id_project,
@@ -80,14 +63,11 @@ export const getRankingStatus = async (eventId) => {
     totalProjects: projects.length,
     fullyEvaluatedProjects,
     allProjectsEvaluated,
-    canPublish: isDeadlinePassed && allProjectsEvaluated,
+    hasIncompleteEvaluations: !allProjectsEvaluated,
+    canPublish: isDeadlinePassed,
     projects,
   };
 };
-
-// ─────────────────────────────────────────────────────────────
-// Publish ranking — calculates all projects then returns ranking
-// ─────────────────────────────────────────────────────────────
 
 export const publishRanking = async (eventId, requestingRole) => {
   if (requestingRole !== "ADMIN") {
@@ -106,17 +86,15 @@ export const publishRanking = async (eventId, requestingRole) => {
     );
   }
 
-  if (!status.allProjectsEvaluated) {
-    const pending = status.projects
-      .filter((p) => !p.fullyEvaluated)
-      .map((p) => p.team)
-      .join(", ");
-    throw new ValidationError(
-      `Los siguientes equipos aún no tienen calificaciones en todas las áreas requeridas: ${pending}.`,
-    );
-  }
+  const incompleteProjects = status.projects.filter((p) => !p.fullyEvaluated);
+  const evaluationWarnings = incompleteProjects.map((p) => ({
+    projectId: p.id,
+    team: p.team,
+    evaluatedAreas: p.evaluatedAreaCount,
+    requiredAreas: p.requiredAreaCount,
+    message: `El equipo "${p.team}" solo tiene ${p.evaluatedAreaCount} de ${p.requiredAreaCount} áreas evaluadas.`,
+  }));
 
-  // Calculate grades for every project in the event
   const projectIds = await RankingRepository.getProjectsForEvent(eventId);
 
   const errors = [];
@@ -124,7 +102,6 @@ export const publishRanking = async (eventId, requestingRole) => {
     try {
       await calculateProjectGrades(projectId, requestingRole);
     } catch (err) {
-      // If already calculated or minor issue, log but don't abort
       if (err instanceof ValidationError) {
         errors.push({ projectId, message: err.message });
       } else {
@@ -133,20 +110,17 @@ export const publishRanking = async (eventId, requestingRole) => {
     }
   }
 
-  // Return the ranking
   const ranking = await RankingRepository.getEventRanking(eventId);
+  const calculatedAt = new Date().toISOString();
 
   return {
     eventId: parseInt(eventId),
-    calculatedAt: new Date().toISOString(),
-    warnings: errors,
+    calculatedAt,
+    warnings: [...evaluationWarnings, ...errors],
+    partialEvaluation: evaluationWarnings.length > 0,
     ranking,
   };
 };
-
-// ─────────────────────────────────────────────────────────────
-// Get published ranking (read-only, no recalculation)
-// ─────────────────────────────────────────────────────────────
 
 export const getPublishedRanking = async (eventId) => {
   const eventRes = await pool.query(
@@ -163,9 +137,18 @@ export const getPublishedRanking = async (eventId) => {
     );
   }
 
+  const calcRes = await pool.query(
+    `SELECT MAX(calculated_at) AS calculated_at
+     FROM individual_project_results ipr
+     JOIN projects p ON p.id_project = ipr.project_id
+     WHERE p.id_event = $1`,
+    [eventId],
+  );
+
   return {
     eventId: parseInt(eventId),
     eventTitle: eventRes.rows[0].title,
+    calculatedAt: calcRes.rows[0]?.calculated_at ?? null,
     ranking,
   };
 };
