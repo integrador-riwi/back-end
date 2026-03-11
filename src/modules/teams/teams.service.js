@@ -330,6 +330,7 @@ export const addMemberToTeam = async (teamId, memberData, userId, userRole) => {
           projectId: teamId,
           repoName: teamProject.repo_name,
           leaderGithubUsername: leaderWithGithub.github_username,
+          leaderToken: leaderWithGithub.github_token,
           githubOrg: githubOrg1,
         },
         {
@@ -418,6 +419,7 @@ export const removeMemberFromTeam = async (
         {
           repoName: teamProject.repo_name,
           leaderGithubUsername: leaderWithGithub.github_username,
+          leaderToken: leaderWithGithub.github_token,
           githubOrg: githubOrgRemove,
         },
         {
@@ -555,6 +557,7 @@ export const acceptInvitation = async (invitationId, userId) => {
           projectId: teamId,
           repoName: teamProject.repo_name,
           leaderGithubUsername: leaderWithGithub.github_username,
+          leaderToken: leaderWithGithub.github_token,
           githubOrg: githubOrg2,
         },
         {
@@ -682,6 +685,7 @@ export const acceptJoinRequest = async (requestId, userId, userRole) => {
           projectId: teamId,
           repoName: teamProject.repo_name,
           leaderGithubUsername: leaderWithGithub.github_username,
+          leaderToken: leaderWithGithub.github_token,
           githubOrg: githubOrg3,
         },
         {

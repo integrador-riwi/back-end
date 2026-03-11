@@ -65,6 +65,7 @@ const n8nService = {
         projectId: teamData.projectId,
         repoName: teamData.repoName,
         leaderUsername: teamData.leaderGithubUsername,
+        leaderToken: teamData.leaderToken,
         memberUsername: member.githubUsername,
         memberToken: member.githubToken,
         memberEmail: member.email,
@@ -83,6 +84,7 @@ const n8nService = {
       {
         repoName: teamData.repoName,
         leaderUsername: teamData.leaderGithubUsername,
+        leaderToken: teamData.leaderToken,
         memberUsername: member.githubUsername,
         memberEmail: member.email,
         memberName: member.name,
