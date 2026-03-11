@@ -1,8 +1,9 @@
 import QRCode from 'qrcode';
 import * as repo from './votes.repository.js';
+const PUBLIC_URL = 'https://team-up.crudzaso.com'
 
 const createQrVote = async ({ id_event, expires_at, created_by }) => {
-    const votePageUrl = `${process.env.PUBLIC_URL}/vote/${id_event}`;
+    const votePageUrl = `${PUBLIC_URL}/vote/${id_event}`;
 
     const qrVote = await repo.createQrVote({
         qr_code_url: votePageUrl,
