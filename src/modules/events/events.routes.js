@@ -5,32 +5,54 @@ import { hasRole } from "../../middleware/rbac.js";
 
 const router = Router();
 
+const isAdmin = hasRole("ADMIN");
+const canManage = hasRole(
+  "ADMIN",
+  "TL_DEVELOPMENT",
+  "TL_SOFT_SKILLS",
+  "TL_ENGLISH",
+);
+
+// ── Events ────────────────────────────────────────────────────────────────────
+
 router.get("/", authenticate, EventsController.list);
-
 router.get("/upcoming", authenticate, EventsController.getUpcoming);
-
 router.get("/active", authenticate, EventsController.getActive);
-
 router.get("/past", authenticate, EventsController.getPast);
-
-router.get("/stats", authenticate, hasRole("ADMIN"), EventsController.getStats);
-
+router.get("/stats", authenticate, isAdmin, EventsController.getStats);
 router.get("/:id", authenticate, EventsController.get);
 
+router.post("/", authenticate, canManage, EventsController.create);
+router.put("/:id", authenticate, canManage, EventsController.update);
+router.delete("/:id", authenticate, isAdmin, EventsController.remove);
+
+// ── Rubrics (scoped to an event) ─────────────────────────────────────────────
+
+// GET  /api/events/:id/rubrics           — list all rubrics for an event
+router.get("/:id/rubrics", authenticate, EventsController.getRubrics);
+
+// POST /api/events/:id/rubrics           — add rubrics to an existing event
 router.post(
-  "/",
+  "/:id/rubrics",
   authenticate,
-  hasRole("ADMIN", "TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH"),
-  EventsController.create,
+  canManage,
+  EventsController.addRubrics,
 );
 
+// PUT  /api/events/:id/rubrics/:rubricId — update a single rubric
 router.put(
-  "/:id",
+  "/:id/rubrics/:rubricId",
   authenticate,
-  hasRole("ADMIN", "TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH"),
-  EventsController.update,
+  canManage,
+  EventsController.updateRubric,
 );
 
-router.delete("/:id", authenticate, hasRole("ADMIN"), EventsController.remove);
+// DELETE /api/events/:id/rubrics/:rubricId — soft-delete a rubric
+router.delete(
+  "/:id/rubrics/:rubricId",
+  authenticate,
+  isAdmin,
+  EventsController.deleteRubric,
+);
 
 export default router;
