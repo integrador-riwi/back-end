@@ -328,46 +328,6 @@ export const addMemberToTeam = async (teamId, memberData, userId, userRole) => {
     console.error("[Socket] Error sending notification:", err.message);
   }
 
-  // Fire n8n in the background — never blocks the response
-  (async () => {
-    try {
-      const leaderWithGithub =
-        await TeamsRepository.getLeaderWithGithub(teamId);
-      const teamProject = await TeamsRepository.getTeamProject(teamId);
-
-      if (leaderWithGithub && teamProject) {
-        const githubOrg1 = await TeamsRepository.getTeamGithubOrg(teamId);
-        await n8nService.triggerMemberInvited(
-          {
-            id: teamId,
-            projectId: teamId,
-            repoName: teamProject.repo_name,
-            leaderGithubUsername: leaderWithGithub.github_username,
-            leaderToken: leaderWithGithub.github_token,
-            githubOrg: githubOrg1,
-          },
-          {
-            githubUsername: memberWithGithub.github_username,
-            githubToken: memberWithGithub.github_token,
-            email: memberWithGithub.email,
-            name: memberWithGithub.name,
-            role: memberData.role || "DEVELOPER",
-          },
-        );
-        console.log("[n8n] triggerMemberInvited OK");
-      } else {
-        console.warn(
-          "[n8n] Skipped: leaderWithGithub=",
-          leaderWithGithub,
-          "teamProject=",
-          teamProject,
-        );
-      }
-    } catch (error) {
-      console.error("[n8n] Error triggering member invited:", error.message);
-    }
-  })();
-
   return {
     ...invitation,
     message:
