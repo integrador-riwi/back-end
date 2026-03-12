@@ -21,6 +21,7 @@ const app = express();
 const allowedOrigins = [
   "https://front-end-olive-six.vercel.app",
   "http://localhost:5173",
+  "http://localhost:5174",
   "https://front-end3-bice.vercel.app",
   "http://localhost:3000",
   "https://team-up.crudzaso.com",

@@ -6,6 +6,14 @@ import {
   ForbiddenError,
   ValidationError,
 } from "../../middleware/errorHandler.js";
+import {
+  emitInvitationCreated,
+  emitJoinRequestCreated,
+  emitInvitationAccepted,
+  emitInvitationRejected,
+  emitJoinRequestAccepted,
+  emitJoinRequestRejected
+} from "../../socket/notifications.js";
 
 export const createTeam = async (
   data,
@@ -357,6 +365,16 @@ export const addMemberToTeam = async (teamId, memberData, userId, userRole) => {
     console.error("[n8n] Full error:", error);
   }
 
+  try {
+    const team = await TeamsRepository.findById(teamId);
+    const eventName = team?.id_event ? (await import("../events/events.repository.js")).default.findById(team.id_event).then(e => e?.name || "Event") : "Event";
+    const invitedUser = await TeamsRepository.getMemberWithGithub(memberData.userId);
+    
+    emitInvitationCreated(invitation, team, invitedUser, eventName);
+  } catch (err) {
+    console.error("[Socket] Error sending notification:", err.message);
+  }
+
   return {
     ...invitation,
     message:
@@ -575,6 +593,14 @@ export const acceptInvitation = async (invitationId, userId) => {
     console.error("Error triggering n8n on accept invitation:", error.message);
   }
 
+  try {
+    const team = await TeamsRepository.findById(invitation.id_team);
+    const user = await TeamsRepository.getMemberWithGithub(userId);
+    emitInvitationAccepted(invitation, team, user);
+  } catch (err) {
+    console.error("[Socket] Error sending accept notification:", err.message);
+  }
+
   return result;
 };
 
@@ -593,7 +619,17 @@ export const rejectInvitation = async (invitationId, userId) => {
     throw new ValidationError("Esta invitación ya ha sido procesada");
   }
 
-  return TeamsRepository.rejectInvitation(invitationId, userId);
+  const result = await TeamsRepository.rejectInvitation(invitationId, userId);
+
+  try {
+    const team = await TeamsRepository.findById(invitation.id_team);
+    const user = await TeamsRepository.getMemberWithGithub(userId);
+    emitInvitationRejected(invitation, team, user);
+  } catch (err) {
+    console.error("[Socket] Error sending reject notification:", err.message);
+  }
+
+  return result;
 };
 
 export const requestToJoinTeam = async (teamId, userId) => {
@@ -625,7 +661,19 @@ export const requestToJoinTeam = async (teamId, userId) => {
     );
   }
 
-  return TeamsRepository.createJoinRequest(teamId, userId);
+  const request = await TeamsRepository.createJoinRequest(teamId, userId);
+  
+  try {
+    const team = await TeamsRepository.findById(teamId);
+    const eventName = team?.id_event ? "Event" : "Event";
+    const coder = await TeamsRepository.getMemberWithGithub(userId);
+    
+    emitJoinRequestCreated(request, team, coder, eventName);
+  } catch (err) {
+    console.error("[Socket] Error sending join request notification:", err.message);
+  }
+
+  return request;
 };
 
 export const getTeamJoinRequests = async (teamId, userId, userRole) => {
@@ -703,6 +751,14 @@ export const acceptJoinRequest = async (requestId, userId, userRole) => {
     console.error("Error triggering n8n on acceptJoinRequest:", error.message);
   }
 
+  try {
+    const team = await TeamsRepository.findById(request.id_team);
+    const coder = await TeamsRepository.getMemberWithGithub(request.id_user);
+    emitJoinRequestAccepted(request, team, coder);
+  } catch (err) {
+    console.error("[Socket] Error sending join request accept notification:", err.message);
+  }
+
   return result;
 };
 
@@ -722,7 +778,17 @@ export const rejectJoinRequest = async (requestId, userId, userRole) => {
     throw new ForbiddenError("No tienes permiso para rechazar esta solicitud");
   }
 
-  return TeamsRepository.rejectJoinRequest(requestId);
+  const result = await TeamsRepository.rejectJoinRequest(requestId);
+
+  try {
+    const team = await TeamsRepository.findById(request.id_team);
+    const coder = await TeamsRepository.getMemberWithGithub(request.id_user);
+    emitJoinRequestRejected(request, team, coder);
+  } catch (err) {
+    console.error("[Socket] Error sending join request reject notification:", err.message);
+  }
+
+  return result;
 };
 
 export default {
