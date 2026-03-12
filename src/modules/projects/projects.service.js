@@ -186,16 +186,30 @@ export const submitProject = async (id, userId, userRole) => {
     if (leaderGithub?.github_token) {
       const repoName =
         project.repo_url?.split("/").filter(Boolean).pop() ?? null;
+
+      // Get github_org and org token from the event
+      let githubOrg = null;
+      let orgToken = null;
+      if (project.id_event) {
+        try {
+          const { findById: findEvent } =
+            await import("../events/events.repository.js");
+          const event = await findEvent(project.id_event);
+          githubOrg = event?.github_org ?? null;
+          orgToken = event?.github_org_token ?? null;
+        } catch (_) {}
+      }
+
       await n8nService.triggerProjectSubmitted(
         {
           id: project.id_project,
           repoName,
           repoUrl: project.repo_url,
-          githubOrg: null,
+          githubOrg,
         },
         {
           githubUsername: leaderGithub.github_username,
-          githubToken: leaderGithub.github_token,
+          githubToken: orgToken ?? leaderGithub.github_token,
         },
       );
     } else {
