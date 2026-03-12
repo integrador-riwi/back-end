@@ -67,22 +67,6 @@ const EvaluationsController = {
     return success(res, results);
   }),
 
-  // POST /api/evaluations/event/:eventId/calculate
-  calculateEventGrades: asyncHandler(async (req, res) => {
-    const eventId = parseInt(req.params.eventId);
-    const requestingRole = req.user.role;
-
-    const result = await EvaluationsService.calculateEventGrades(
-      eventId,
-      requestingRole,
-    );
-
-    return success(res, {
-      message: `Grades calculated for ${result.calculated} project(s).`,
-      ...result,
-    });
-  }),
-
   // GET /api/evaluations/event/:eventId/results
   // Returns persisted grade results for all projects in an event.
   getEventResults: asyncHandler(async (req, res) => {

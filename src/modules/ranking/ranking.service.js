@@ -64,7 +64,7 @@ export const getRankingStatus = async (eventId) => {
     fullyEvaluatedProjects,
     allProjectsEvaluated,
     hasIncompleteEvaluations: !allProjectsEvaluated,
-    canPublish: isDeadlinePassed,
+    canPublish: true, // Admin can always publish — UI shows warnings if deadline hasn't passed
     projects,
   };
 };
@@ -76,16 +76,6 @@ export const publishRanking = async (eventId, requestingRole) => {
 
   const status = await getRankingStatus(eventId);
 
-  if (!status.isDeadlinePassed) {
-    throw new ValidationError(
-      `El evento aún no ha cerrado. Fecha de entrega: ${
-        status.deliveryDate
-          ? new Date(status.deliveryDate).toLocaleDateString("es-CO")
-          : "no definida"
-      }.`,
-    );
-  }
-
   const incompleteProjects = status.projects.filter((p) => !p.fullyEvaluated);
   const evaluationWarnings = incompleteProjects.map((p) => ({
     projectId: p.id,
@@ -94,6 +84,16 @@ export const publishRanking = async (eventId, requestingRole) => {
     requiredAreas: p.requiredAreaCount,
     message: `El equipo "${p.team}" solo tiene ${p.evaluatedAreaCount} de ${p.requiredAreaCount} áreas evaluadas.`,
   }));
+
+  // Warn if deadline hasn't passed, but don't block
+  const deadlineWarning =
+    !status.isDeadlinePassed && status.deliveryDate
+      ? [
+          {
+            message: `El evento aún no ha cerrado (fecha de entrega: ${new Date(status.deliveryDate).toLocaleDateString("es-CO")}). Ranking publicado de forma anticipada.`,
+          },
+        ]
+      : [];
 
   const projectIds = await RankingRepository.getProjectsForEvent(eventId);
 
@@ -116,7 +116,7 @@ export const publishRanking = async (eventId, requestingRole) => {
   return {
     eventId: parseInt(eventId),
     calculatedAt,
-    warnings: [...evaluationWarnings, ...errors],
+    warnings: [...deadlineWarning, ...evaluationWarnings, ...errors],
     partialEvaluation: evaluationWarnings.length > 0,
     ranking,
   };

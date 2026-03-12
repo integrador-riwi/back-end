@@ -312,50 +312,6 @@ export const calculateProjectGrades = async (projectId, requestingRole) => {
   return savedResults;
 };
 
-// ── Calculate grades for ALL projects in an event ────────────────────────────
-
-export const calculateEventGrades = async (eventId, requestingRole) => {
-  if (requestingRole !== "ADMIN") {
-    throw new ForbiddenError(
-      "Only Admins can calculate grades for an entire event.",
-    );
-  }
-
-  const eventRes = await pool.query(
-    "SELECT id_event FROM events WHERE id_event = $1",
-    [eventId],
-  );
-  if (!eventRes.rows[0]) throw new NotFoundError("Event not found.");
-
-  const projectsRes = await pool.query(
-    "SELECT id_project FROM projects WHERE id_event = $1",
-    [eventId],
-  );
-
-  if (!projectsRes.rows.length) {
-    throw new ValidationError("No projects found for this event.");
-  }
-
-  const allResults = [];
-  const errors = [];
-
-  for (const { id_project } of projectsRes.rows) {
-    try {
-      const results = await calculateProjectGrades(id_project, requestingRole);
-      allResults.push({ projectId: id_project, results });
-    } catch (err) {
-      // Skip projects with no evaluations yet, collect the rest
-      errors.push({ projectId: id_project, reason: err.message });
-    }
-  }
-
-  return {
-    calculated: allResults.length,
-    skipped: errors,
-    results: allResults,
-  };
-};
-
 // ── Read persisted results for a project ─────────────────────────────────────
 
 export const getProjectResults = async (projectId) => {
@@ -403,7 +359,6 @@ export default {
   submitEvaluations,
   getMyEvaluationsForProject,
   calculateProjectGrades,
-  calculateEventGrades,
   getProjectResults,
   getEventResults,
 };
