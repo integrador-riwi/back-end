@@ -47,8 +47,14 @@ router.get(
   EvaluationsController.getProjectResults,
 );
 
+router.post(
+  "/event/:eventId/calculate",
+  authenticate,
+  hasRole("ADMIN"),
+  EvaluationsController.calculateEventGrades,
+);
+
 router.get(
-  "/event/:eventId/results",
   authenticate,
   hasRole("ADMIN", "TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH"),
   EvaluationsController.getEventResults,
