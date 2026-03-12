@@ -75,6 +75,19 @@ export const submitEvaluations = async ({
     throw new ValidationError("You must provide at least one evaluation.");
   }
 
+  // Block re-submission: if this TL already has ANY evaluation for this project, reject
+  const existingCheck = await pool.query(
+    `SELECT id_evaluation FROM evaluations
+     WHERE project_id = $1 AND evaluator_user_id = $2
+     LIMIT 1`,
+    [projectId, evaluatorUserId],
+  );
+  if (existingCheck.rows.length > 0) {
+    throw new ForbiddenError(
+      "You have already submitted evaluations for this project.",
+    );
+  }
+
   const results = [];
 
   for (const ev of evaluations) {
@@ -229,16 +242,26 @@ export const calculateProjectGrades = async (projectId, requestingRole) => {
       });
     }
 
-    // Student final = average of all area scores (only evaluated areas count)
-    const areaScoreValues = Object.values(areaFinalScores);
+    // Student final = weighted average across areas
+    // DEVELOPMENT 55%, ENGLISH 25%, SOFT_SKILLS 20%
+    const AREA_WEIGHTS = {
+      DEVELOPMENT: 0.55,
+      ENGLISH: 0.25,
+      SOFT_SKILLS: 0.2,
+    };
+
+    let weightedAreaSum = 0;
+    let totalAreaWeight = 0;
+
+    for (const [area, score] of Object.entries(areaFinalScores)) {
+      const areaWeight = AREA_WEIGHTS[area] ?? 0;
+      weightedAreaSum += score * areaWeight;
+      totalAreaWeight += areaWeight;
+    }
+
     const studentFinal =
-      areaScoreValues.length > 0
-        ? parseFloat(
-            (
-              areaScoreValues.reduce((a, b) => a + b, 0) /
-              areaScoreValues.length
-            ).toFixed(2),
-          )
+      totalAreaWeight > 0
+        ? parseFloat((weightedAreaSum / totalAreaWeight).toFixed(2))
         : 0;
 
     // Persist project result
