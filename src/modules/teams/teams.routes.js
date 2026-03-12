@@ -66,15 +66,15 @@ router.post(
 router.post("/:id/request-join", authenticate, TeamsController.requestJoinTeam);
 
 router.get(
-  "/:id/join-requests",
-  authenticate,
-  TeamsController.getTeamJoinRequests,
-);
-
-router.get(
   "/join-requests/my",
   authenticate,
   TeamsController.getMyJoinRequests,
+);
+
+router.get(
+  "/:id/join-requests",
+  authenticate,
+  TeamsController.getTeamJoinRequests,
 );
 
 router.post(
