@@ -15,30 +15,41 @@ export function initializeSocket(server) {
   io.use((socket, next) => {
     const token = socket.handshake.auth.token || socket.handshake.query.token;
     
+    console.log("[Socket] Token received:", token ? `${token.substring(0, 30)}...` : "NO TOKEN");
+    console.log("[Socket] JWT_SECRET:", process.env.JWT_SECRET || "default-secret");
+
     if (!token) {
+      console.log("[Socket] No token provided");
       return next(new Error("Authentication required"));
     }
 
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || "default-secret");
+      console.log("[Socket] Decoded user:", decoded);
       socket.user = decoded;
       next();
     } catch (err) {
-      next(new Error("Invalid token"));
+      console.error("[Socket] Token verification failed:", err.message);
+      next(new Error("Invalid token: " + err.message));
     }
   });
 
   io.on("connection", (socket) => {
-    const userId = socket.user.id;
+    const userId = socket.user?.id_user;
+    const userEmail = socket.user?.email;
     
-    connectedUsers.set(userId, socket.id);
-    console.log(`User ${userId} connected with socket ${socket.id}`);
+    console.log(`[Socket] User ${userId} (${userEmail}) connected with socket ${socket.id}`);
 
-    socket.join(`user_${userId}`);
+    if (userId) {
+      connectedUsers.set(userId, socket.id);
+      socket.join(`user_${userId}`);
+    }
 
     socket.on("disconnect", () => {
-      connectedUsers.delete(userId);
-      console.log(`User ${userId} disconnected`);
+      if (userId) {
+        connectedUsers.delete(userId);
+        console.log(`[Socket] User ${userId} disconnected`);
+      }
     });
   });
 

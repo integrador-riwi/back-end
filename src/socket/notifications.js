@@ -7,14 +7,30 @@ export function setSocketIO(socketIO) {
 }
 
 export function sendToUser(userId, event, data) {
-  if (!io) return;
+  if (!io) {
+    console.log("[Socket] IO not initialized, cannot send notification");
+    return;
+  }
+  
+  if (!userId) {
+    console.log("[Socket] Cannot send notification: userId is undefined");
+    return;
+  }
+  
+  console.log(`[Socket] Sending ${event} to user ${userId}:`, data);
   
   const users = io.sockets.sockets;
+  let found = false;
   for (const [socketId, socket] of users) {
-    if (socket.user && socket.user.id === userId) {
+    if (socket.user && socket.user.id_user === userId) {
       socket.emit(event, data);
+      found = true;
       break;
     }
+  }
+  
+  if (!found) {
+    console.log(`[Socket] User ${userId} not connected, notification queued (offline)`);
   }
 }
 
