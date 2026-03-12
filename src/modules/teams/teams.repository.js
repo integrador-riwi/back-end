@@ -651,12 +651,12 @@ export const getPendingInvitationsByUser = async (userId) => {
       i.invited_by,
       i.created_at,
       t.name as team_name,
-      e.name as event_name,
+      e.event_name as event_name,
       lu.name as invited_by_name,
       lu.email as invited_by_email
     FROM team_invitations i
     JOIN teams t ON i.id_team = t.id_team
-    JOIN events e ON t.id_event = e.id_event
+    LEFT JOIN events e ON t.id_event = e.id_event
     JOIN users lu ON i.invited_by = lu.id_user
     WHERE i.id_user = $1 AND i.status = 'PENDING'
     ORDER BY i.created_at DESC
