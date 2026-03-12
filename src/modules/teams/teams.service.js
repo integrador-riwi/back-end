@@ -172,8 +172,6 @@ export const getTeamById = async (id, userId, userRole) => {
     userRole,
   );
 
-    console.log("melos", isAdmin)
-    console.log("userId", userId)
   if (!isMember && !isAdmin && !isTL) {
     throw new ForbiddenError("No tienes acceso a este equipo");
   }
@@ -363,6 +361,13 @@ export const removeMemberFromTeam = async (
   const memberWithGithub = await TeamsRepository.getMemberWithGithub(memberId);
   const memberIsLeader = await TeamsRepository.isLeader(teamId, memberId);
   const memberCount = await TeamsRepository.countTeamMembers(teamId);
+
+  // Si el líder intenta salir pero hay otros miembros, bloquearlo
+  if (memberIsLeader && memberCount > 1) {
+    throw new ForbiddenError(
+      "No puedes salir del equipo siendo líder si hay otros miembros. Expúlsalos primero.",
+    );
+  }
 
   // Si el lider se va y el equipo esta vacio (solo el), eliminar el equipo
   if (memberIsLeader && memberCount <= 1) {
