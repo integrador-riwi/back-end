@@ -316,70 +316,57 @@ export const addMemberToTeam = async (teamId, memberData, userId, userRole) => {
     userId,
   );
 
+  // Emit socket notification immediately — don't wait for n8n
   try {
-    const leaderWithGithub = await TeamsRepository.getLeaderWithGithub(teamId);
-    const teamProject = await TeamsRepository.getTeamProject(teamId);
-
-    console.log("[n8n] leaderWithGithub:", JSON.stringify(leaderWithGithub));
-    console.log("[n8n] teamProject:", JSON.stringify(teamProject));
-    console.log(
-      "[n8n] memberWithGithub:",
-      JSON.stringify({
-        githubUsername: memberWithGithub.github_username,
-        email: memberWithGithub.email,
-        name: memberWithGithub.name,
-      }),
-    );
-
-    if (leaderWithGithub && teamProject) {
-      console.log("[n8n] Firing triggerMemberInvited...");
-      const githubOrg1 = await TeamsRepository.getTeamGithubOrg(teamId);
-      await n8nService.triggerMemberInvited(
-        {
-          id: teamId,
-          projectId: teamId,
-          repoName: teamProject.repo_name,
-          leaderGithubUsername: leaderWithGithub.github_username,
-          leaderToken: leaderWithGithub.github_token,
-          githubOrg: githubOrg1,
-        },
-        {
-          githubUsername: memberWithGithub.github_username,
-          githubToken: memberWithGithub.github_token,
-          email: memberWithGithub.email,
-          name: memberWithGithub.name,
-          role: memberData.role || "DEVELOPER",
-        },
-      );
-      console.log("[n8n] triggerMemberInvited OK");
-    } else {
-      console.warn(
-        "[n8n] Skipped: leaderWithGithub=",
-        leaderWithGithub,
-        "teamProject=",
-        teamProject,
-      );
-    }
-  } catch (error) {
-    console.error("[n8n] Error triggering member invited:", error.message);
-    console.error("[n8n] Full error:", error);
-  }
-
-  try {
-    const team = await TeamsRepository.findById(teamId);
     const eventName = team?.id_event
       ? (await import("../events/events.repository.js")).default
           .findById(team.id_event)
-          .then((e) => e?.name || "Event")
+          .then((e) => e?.event_name || "Event")
       : "Event";
-    const invitedUser = await TeamsRepository.getMemberWithGithub(
-      memberData.userId,
-    );
-
-    emitInvitationCreated(invitation, team, invitedUser, eventName);
+    emitInvitationCreated(invitation, team, memberWithGithub, eventName);
   } catch (err) {
     console.error("[Socket] Error sending notification:", err.message);
   }
+
+  // Fire n8n in the background — never blocks the response
+  (async () => {
+    try {
+      const leaderWithGithub =
+        await TeamsRepository.getLeaderWithGithub(teamId);
+      const teamProject = await TeamsRepository.getTeamProject(teamId);
+
+      if (leaderWithGithub && teamProject) {
+        const githubOrg1 = await TeamsRepository.getTeamGithubOrg(teamId);
+        await n8nService.triggerMemberInvited(
+          {
+            id: teamId,
+            projectId: teamId,
+            repoName: teamProject.repo_name,
+            leaderGithubUsername: leaderWithGithub.github_username,
+            leaderToken: leaderWithGithub.github_token,
+            githubOrg: githubOrg1,
+          },
+          {
+            githubUsername: memberWithGithub.github_username,
+            githubToken: memberWithGithub.github_token,
+            email: memberWithGithub.email,
+            name: memberWithGithub.name,
+            role: memberData.role || "DEVELOPER",
+          },
+        );
+        console.log("[n8n] triggerMemberInvited OK");
+      } else {
+        console.warn(
+          "[n8n] Skipped: leaderWithGithub=",
+          leaderWithGithub,
+          "teamProject=",
+          teamProject,
+        );
+      }
+    } catch (error) {
+      console.error("[n8n] Error triggering member invited:", error.message);
+    }
+  })();
 
   return {
     ...invitation,
