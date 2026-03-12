@@ -12,7 +12,7 @@ import {
   emitInvitationAccepted,
   emitInvitationRejected,
   emitJoinRequestAccepted,
-  emitJoinRequestRejected
+  emitJoinRequestRejected,
 } from "../../socket/notifications.js";
 
 export const createTeam = async (
@@ -367,9 +367,15 @@ export const addMemberToTeam = async (teamId, memberData, userId, userRole) => {
 
   try {
     const team = await TeamsRepository.findById(teamId);
-    const eventName = team?.id_event ? (await import("../events/events.repository.js")).default.findById(team.id_event).then(e => e?.name || "Event") : "Event";
-    const invitedUser = await TeamsRepository.getMemberWithGithub(memberData.userId);
-    
+    const eventName = team?.id_event
+      ? (await import("../events/events.repository.js")).default
+          .findById(team.id_event)
+          .then((e) => e?.name || "Event")
+      : "Event";
+    const invitedUser = await TeamsRepository.getMemberWithGithub(
+      memberData.userId,
+    );
+
     emitInvitationCreated(invitation, team, invitedUser, eventName);
   } catch (err) {
     console.error("[Socket] Error sending notification:", err.message);
@@ -662,15 +668,17 @@ export const requestToJoinTeam = async (teamId, userId) => {
   }
 
   const request = await TeamsRepository.createJoinRequest(teamId, userId);
-  
+
   try {
-    const team = await TeamsRepository.findById(teamId);
     const eventName = team?.id_event ? "Event" : "Event";
     const coder = await TeamsRepository.getMemberWithGithub(userId);
-    
+
     emitJoinRequestCreated(request, team, coder, eventName);
   } catch (err) {
-    console.error("[Socket] Error sending join request notification:", err.message);
+    console.error(
+      "[Socket] Error sending join request notification:",
+      err.message,
+    );
   }
 
   return request;
@@ -756,7 +764,10 @@ export const acceptJoinRequest = async (requestId, userId, userRole) => {
     const coder = await TeamsRepository.getMemberWithGithub(request.id_user);
     emitJoinRequestAccepted(request, team, coder);
   } catch (err) {
-    console.error("[Socket] Error sending join request accept notification:", err.message);
+    console.error(
+      "[Socket] Error sending join request accept notification:",
+      err.message,
+    );
   }
 
   return result;
@@ -785,7 +796,10 @@ export const rejectJoinRequest = async (requestId, userId, userRole) => {
     const coder = await TeamsRepository.getMemberWithGithub(request.id_user);
     emitJoinRequestRejected(request, team, coder);
   } catch (err) {
-    console.error("[Socket] Error sending join request reject notification:", err.message);
+    console.error(
+      "[Socket] Error sending join request reject notification:",
+      err.message,
+    );
   }
 
   return result;
