@@ -182,6 +182,7 @@ export const getTeamById = async (id, userId, userRole) => {
   );
 
     console.log("melos", isAdmin)
+    console.log("userId", userId)
   if (!isMember && !isAdmin && !isTL) {
     throw new ForbiddenError("No tienes acceso a este equipo");
   }
