@@ -77,7 +77,6 @@ export const createTeam = async (
     // Fetch event to get githubOrg if provided
     let githubOrg = null;
     let githubOrgToken = null;
-    console.log("[createTeam] data.idEvent:", data.idEvent);
     if (data.idEvent) {
       try {
         const { findById: findEvent } =
@@ -85,8 +84,6 @@ export const createTeam = async (
         const event = await findEvent(data.idEvent);
         githubOrg = event?.github_org ?? null;
         githubOrgToken = event?.github_org_token ?? null;
-        console.log("[createTeam] event:", event);
-        console.log("[createTeam] githubOrg:", githubOrg);
       } catch (_) {}
     }
 
@@ -112,12 +109,6 @@ export const createTeam = async (
       repoUrl = n8nData.repositoryUrl || n8nData.repository_url || null;
       savedRepoName = n8nData.repositoryName || repoName;
     }
-    console.log(
-      "[n8n team-created] savedRepoName:",
-      savedRepoName,
-      "repoUrl:",
-      repoUrl,
-    );
 
     // Guardar el repo en team_projects para que invite/remove funcionen
     await TeamsRepository.saveTeamProject(team.id_team, {
@@ -617,7 +608,15 @@ export const requestToJoinTeam = async (teamId, userId) => {
   const request = await TeamsRepository.createJoinRequest(teamId, userId);
 
   try {
-    const eventName = team?.id_event ? "Event" : "Event";
+    let eventName = "Event";
+    if (team?.id_event) {
+      try {
+        const { findById: findEvent } =
+          await import("../events/events.repository.js");
+        const event = await findEvent(team.id_event);
+        eventName = event?.event_name || "Event";
+      } catch (_) {}
+    }
     const coder = await TeamsRepository.getMemberWithGithub(userId);
 
     emitJoinRequestCreated(request, team, coder, eventName);
