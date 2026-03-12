@@ -63,7 +63,7 @@ app.use("/api/events/:eventId/ranking", rankingRoutes);
 app.use("/api/comments", commentsRoutes);
 app.use("/api/evaluations", evaluationsRoutes);
 
-// Endpoint to send emails
+// Endpoint to send emails u
 app.use("/api/emails", emailRoutes);
 
 // Endpoint to manage QR Votes
