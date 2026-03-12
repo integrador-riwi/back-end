@@ -8,14 +8,7 @@ export function setSocketIO(socketIO) {
 
 export function sendToUser(userId, event, data) {
   if (!io || !userId) return;
-
-  const users = io.sockets.sockets;
-  for (const [socketId, socket] of users) {
-    if (socket.user && socket.user.id_user === userId) {
-      socket.emit(event, data);
-      break;
-    }
-  }
+  io.to(`user_${userId}`).emit(event, data);
 }
 
 export function emitInvitationCreated(
