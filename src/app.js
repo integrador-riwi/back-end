@@ -6,6 +6,7 @@ import usersRoutes from "./modules/users/users.routes.js";
 import teamsRoutes from "./modules/teams/teams.routes.js";
 import projectsRoutes from "./modules/projects/projects.routes.js";
 import eventsRoutes from "./modules/events/events.routes.js";
+import rankingRoutes from "./modules/ranking/ranking.routes.js";
 import commentsRoutes from "./modules/comments/comments.routes.js";
 import evaluationsRoutes from "./modules/evaluations/evaluations.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -39,17 +40,13 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
 };
 
-// Handle preflight requests for ALL routes before anything else
 app.options("*", cors(corsOptions));
 app.use(cors(corsOptions));
 
-// Body parsers — must come before route handlers (webhook has its own raw parser internally)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Webhook needs raw body for signature verification — registered after global parsers
-// so that express.raw() inside only affects /api/webhooks/* traffic
 app.use("/api/webhooks", githubWebhookRouter);
 
 app.get("/api/health", (req, res) => {
@@ -61,6 +58,7 @@ app.use("/api/users", usersRoutes);
 app.use("/api/teams", teamsRoutes);
 app.use("/api/projects", projectsRoutes);
 app.use("/api/events", eventsRoutes);
+app.use("/api/events/:eventId/ranking", rankingRoutes);
 app.use("/api/comments", commentsRoutes);
 app.use("/api/evaluations", evaluationsRoutes);
 
