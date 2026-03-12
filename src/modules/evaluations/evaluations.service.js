@@ -88,49 +88,73 @@ export const submitEvaluations = async ({
     );
   }
 
+  // Wrap all inserts in a transaction — if any row fails the whole submit rolls back,
+  // leaving no partial/orphan rows that would permanently block the TL.
+  const client = await pool.connect();
   const results = [];
 
-  for (const ev of evaluations) {
-    const { evaluatedUserId, gradeId, feedback } = ev;
+  try {
+    await client.query("BEGIN");
 
-    if (!evaluatedUserId || !gradeId) {
-      throw new ValidationError(
-        "Each evaluation requires evaluatedUserId and gradeId.",
+    for (const ev of evaluations) {
+      const { evaluatedUserId, gradeId, feedback } = ev;
+
+      if (!evaluatedUserId || !gradeId) {
+        throw new ValidationError(
+          "Each evaluation requires evaluatedUserId and gradeId.",
+        );
+      }
+
+      // Get area from rubric linked to this grade
+      const gradeRes = await client.query(
+        `SELECT g.id_grade, g.id_rubric, r.area
+         FROM grades g
+         JOIN rubrics r ON g.id_rubric = r.id_rubric
+         WHERE g.id_grade = $1`,
+        [gradeId],
       );
+      const gradeRow = gradeRes.rows[0];
+      if (!gradeRow) throw new NotFoundError(`Grade ${gradeId} not found.`);
+
+      const area = gradeRow.area;
+
+      // Enforce area restriction: TLs can only evaluate their assigned area
+      if (allowedArea && area !== allowedArea) {
+        throw new ForbiddenError(
+          `As ${evaluatorRole} you can only evaluate the ${allowedArea} area, not ${area}.`,
+        );
+      }
+
+      const saved = await client.query(
+        `INSERT INTO evaluations
+           (project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade)
+         VALUES ($1, $2, $3, $4, $5::evaluation_area, $6, $7)
+         ON CONFLICT (project_id, evaluator_user_id, evaluated_user_id, area)
+         DO UPDATE SET
+           feedback = EXCLUDED.feedback,
+           id_grade = EXCLUDED.id_grade,
+           event_id = EXCLUDED.event_id
+         RETURNING id_evaluation, project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade, created_at`,
+        [
+          projectId,
+          eventId,
+          evaluatorUserId,
+          evaluatedUserId,
+          area,
+          feedback ?? null,
+          gradeId,
+        ],
+      );
+
+      results.push(saved.rows[0]);
     }
 
-    // Get area from rubric linked to this grade
-    const gradeRes = await pool.query(
-      `SELECT g.id_grade, g.id_rubric, r.area
-       FROM grades g
-       JOIN rubrics r ON g.id_rubric = r.id_rubric
-       WHERE g.id_grade = $1`,
-      [gradeId],
-    );
-    const gradeRow = gradeRes.rows[0];
-    if (!gradeRow) throw new NotFoundError(`Grade ${gradeId} not found.`);
-
-    const area = gradeRow.area;
-
-    // Enforce area restriction: TLs can only evaluate their assigned area
-    if (allowedArea && area !== allowedArea) {
-      throw new ForbiddenError(
-        `As ${evaluatorRole} you can only evaluate the ${allowedArea} area, not ${area}.`,
-      );
-    }
-
-    // Upsert: one query handles both insert and update
-    const saved = await EvaluationsRepository.upsertEvaluation({
-      projectId,
-      eventId,
-      evaluatorUserId,
-      evaluatedUserId,
-      area,
-      feedback,
-      gradeId,
-    });
-
-    results.push(saved);
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
   }
 
   // ── Auto-calculate if all required areas now have at least one evaluator ──
