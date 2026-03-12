@@ -133,6 +133,35 @@ export const submitEvaluations = async ({
     results.push(saved);
   }
 
+  // ── Auto-calculate if all required areas now have at least one evaluator ──
+  // Required areas = distinct areas with active rubrics for this event
+  const requiredAreasRes = await pool.query(
+    `SELECT DISTINCT area FROM rubrics WHERE id_event = $1 AND active = true`,
+    [eventId],
+  );
+  const requiredAreas = requiredAreasRes.rows.map((r) => r.area);
+
+  if (requiredAreas.length > 0) {
+    // Covered areas = distinct areas that have at least 1 evaluation for this project
+    const coveredAreasRes = await pool.query(
+      `SELECT DISTINCT e.area
+       FROM evaluations e
+       JOIN rubrics r ON r.area = e.area AND r.id_event = $2 AND r.active = true
+       WHERE e.project_id = $1`,
+      [projectId, eventId],
+    );
+    const coveredAreas = coveredAreasRes.rows.map((r) => r.area);
+
+    const allCovered = requiredAreas.every((a) => coveredAreas.includes(a));
+
+    if (allCovered) {
+      // Fire-and-forget — don't block the response if calculation fails
+      calculateProjectGrades(projectId, evaluatorRole).catch((err) => {
+        console.error(`[auto-calculate] project ${projectId}:`, err.message);
+      });
+    }
+  }
+
   return results;
 };
 
