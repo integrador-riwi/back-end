@@ -102,6 +102,7 @@ export const getEvaluationsByProject = async (projectId, evaluatorUserId) => {
       e.area,
       e.feedback,
       e.created_at,
+      e.id_grade,
       g.score,
       g.id_rubric,
       u.name AS evaluated_name,
