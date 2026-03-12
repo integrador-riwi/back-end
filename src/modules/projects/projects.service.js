@@ -206,6 +206,7 @@ export const submitProject = async (id, userId, userRole) => {
           repoName,
           repoUrl: project.repo_url,
           githubOrg,
+          orgToken,
         },
         {
           githubUsername: leaderGithub.github_username,

@@ -39,6 +39,7 @@ const n8nService = {
         repoUrl: projectData.repoUrl,
         leaderUsername: leader.githubUsername,
         leaderToken: leader.githubToken,
+        orgToken: projectData.orgToken ?? null,
         githubOrg: projectData.githubOrg ?? null,
         submittedAt: new Date().toISOString(),
       },
