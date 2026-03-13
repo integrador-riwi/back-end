@@ -36,6 +36,14 @@ export function initializeSocket(server) {
       socket.join(`user_${userId}`);
     }
 
+    socket.on("join_project", (projectId) => {
+      socket.join(`project_${projectId}`);
+    });
+
+    socket.on("leave_project", (projectId) => {
+      socket.leave(`project_${projectId}`);
+    });
+
     socket.on("disconnect", () => {
       if (userId) {
         connectedUsers.delete(userId);

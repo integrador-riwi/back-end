@@ -88,6 +88,12 @@ export function emitJoinRequestRejected(request, team, coder) {
   });
 }
 
+export function emitCommentCreated(projectId, comment) {
+  if (!io) return;
+
+  io.to(`project_${projectId}`).emit("comment:new", comment);
+}
+
 export default {
   setSocketIO,
   sendToUser,
@@ -97,4 +103,5 @@ export default {
   emitInvitationRejected,
   emitJoinRequestAccepted,
   emitJoinRequestRejected,
+  emitCommentCreated,
 };

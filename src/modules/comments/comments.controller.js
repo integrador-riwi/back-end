@@ -1,6 +1,7 @@
 import CommentsService from "./comments.service.js";
 import { success, created, noContent } from "../../utils/response.js";
 import { asyncHandler } from "../../middleware/errorHandler.js";
+import { emitCommentCreated } from "../../socket/notifications.js";
 
 /**
  * GET /api/comments/project/:projectId
@@ -28,6 +29,9 @@ export const create = asyncHandler(async (req, res) => {
     comment,
     parentCommentId,
   });
+
+  const io = req.app.get("io");
+  emitCommentCreated(projectId, newComment);
 
   return created(res, newComment);
 });
