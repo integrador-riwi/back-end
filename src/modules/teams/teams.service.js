@@ -626,6 +626,7 @@ export const requestToJoinTeam = async (teamId, userId) => {
     }
     const coder = await TeamsRepository.getMemberWithGithub(userId);
 
+    console.log("[Socket] emitJoinRequestCreated - leader_id:", team.leader_id, "requestId:", request.id_request);
     emitJoinRequestCreated(request, team, coder, eventName);
   } catch (err) {
     console.error(
