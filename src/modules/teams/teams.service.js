@@ -310,11 +310,14 @@ export const addMemberToTeam = async (teamId, memberData, userId, userRole) => {
 
   // Emit socket notification immediately — don't wait for n8n
   try {
-    const eventName = team?.id_event
-      ? (await import("../events/events.repository.js")).default
-          .findById(team.id_event)
-          .then((e) => e?.event_name || "Event")
-      : "Event";
+    let eventName = "Event";
+    if (team?.id_event) {
+      try {
+        const { findById } = await import("../events/events.repository.js");
+        const event = await findById(team.id_event);
+        eventName = event?.event_name || "Event";
+      } catch (_) {}
+    }
     emitInvitationCreated(invitation, team, memberWithGithub, eventName);
   } catch (err) {
     console.error("[Socket] Error sending notification:", err.message);
