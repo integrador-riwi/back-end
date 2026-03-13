@@ -19,7 +19,8 @@ const createQrVote = async ({ id_event, expires_at, created_by }) => {
 };
 
 const getQrsByEvent = async (id_event) => {
-    return repo.getQrsByEvent(id_event);
+    const qrImage = await repo.getQrsByEvent(id_event);
+    return QRCode.toDataURL(qrImage.qr_code_url);
 };
 
 const toggleQrActive = async (id) => {
