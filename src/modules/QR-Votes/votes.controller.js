@@ -21,8 +21,8 @@ const createQrVote = async (req, res) => {
 // Admin: lista todos los QRs de un evento
 const getQrsByEvent = async (req, res) => {
     try {
-        const { eventId } = req.params;
-        const qrs = await service.getQrsByEvent(eventId);
+        const { id } = req.params;
+        const qrs = await service.getQrsByEvent(id);
         res.json(qrs);
     } catch (err) {
         const status = err.status || 500;

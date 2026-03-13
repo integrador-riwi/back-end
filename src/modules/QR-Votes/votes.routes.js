@@ -12,7 +12,7 @@ const router = Router();
 router.post('/', authenticate, controller.createQrVote);
 
 // Listar todos los QRs de un evento
-router.get('/event/:eventId', authenticate, controller.getQrsByEvent);
+router.get('/event/:id', authenticate, controller.getQrsByEvent);
 
 // Ver resultados de votos públicos de un evento
 router.get('/event/:eventId/results', authenticate, controller.getResults);
