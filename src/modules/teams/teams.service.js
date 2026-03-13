@@ -13,6 +13,7 @@ import {
   emitInvitationRejected,
   emitJoinRequestAccepted,
   emitJoinRequestRejected,
+  emitMemberRemoved,
 } from "../../socket/notifications.js";
 
 export const createTeam = async (
@@ -402,6 +403,12 @@ export const removeMemberFromTeam = async (
     }
   } catch (error) {
     console.error("Error triggering n8n member removed:", error.message);
+  }
+
+  try {
+    emitMemberRemoved(team, memberWithGithub);
+  } catch (err) {
+    console.error("[Socket] Error sending member removed notification:", err.message);
   }
 
   return member;

@@ -102,6 +102,18 @@ export function emitCommentCreated(projectId, comment) {
   io.to(`project_${projectId}`).emit("comment:new", comment);
 }
 
+export function emitMemberRemoved(team, member) {
+  if (!io) return;
+
+  sendToUser(member.id_user, "team:member_removed", {
+    teamId: team.id_team,
+    teamName: team.name,
+    memberId: member.id_user,
+    memberName: member.name,
+    type: "member_removed",
+  });
+}
+
 export default {
   setSocketIO,
   sendToUser,
@@ -112,4 +124,5 @@ export default {
   emitJoinRequestAccepted,
   emitJoinRequestRejected,
   emitCommentCreated,
+  emitMemberRemoved,
 };
