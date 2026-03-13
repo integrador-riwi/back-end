@@ -21,7 +21,6 @@ export function initializeSocket(server) {
 
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || "default-secret");
-      console.log("[Socket] Token decoded:", decoded);
       socket.user = decoded;
       next();
     } catch (err) {

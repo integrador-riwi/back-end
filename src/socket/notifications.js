@@ -8,10 +8,8 @@ export function setSocketIO(socketIO) {
 
 export function sendToUser(userId, event, data) {
   if (!io || !userId) {
-    console.log("[Socket] sendToUser - io or userId missing. io:", !!io, "userId:", userId);
     return;
   }
-  console.log("[Socket] sendToUser - emitting to user_%s, event: %s", userId, event);
   io.to(`user_${userId}`).emit(event, data);
 }
 
@@ -36,11 +34,9 @@ export function emitInvitationCreated(
 
 export function emitJoinRequestCreated(request, team, coder, eventName) {
   if (!io) {
-    console.log("[Socket] emitJoinRequestCreated - io is null!");
     return;
   }
 
-  console.log("[Socket] emitJoinRequestCreated - sending to user:", team.leader_id);
   sendToUser(team.leader_id, "join_request:new", {
     id: request.id_request,
     teamId: team.id_team,
