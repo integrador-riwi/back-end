@@ -7,6 +7,7 @@ import teamsRoutes from "./modules/teams/teams.routes.js";
 import projectsRoutes from "./modules/projects/projects.routes.js";
 import eventsRoutes from "./modules/events/events.routes.js";
 import rankingRoutes from "./modules/ranking/ranking.routes.js";
+import finalistsRoutes from "./modules/finalists/finalists.routes.js";
 import commentsRoutes from "./modules/comments/comments.routes.js";
 import evaluationsRoutes from "./modules/evaluations/evaluations.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -60,6 +61,7 @@ app.use("/api/teams", teamsRoutes);
 app.use("/api/projects", projectsRoutes);
 app.use("/api/events", eventsRoutes);
 app.use("/api/events/:eventId/ranking", rankingRoutes);
+app.use("/api/events/:eventId/finalists", finalistsRoutes);
 app.use("/api/comments", commentsRoutes);
 app.use("/api/evaluations", evaluationsRoutes);
 
