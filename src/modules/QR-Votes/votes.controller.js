@@ -20,6 +20,7 @@ const createQrVote = async (req, res) => {
 // GET /api/qr-votes/event/:eventId
 // Admin: lista todos los QRs de un evento
 const getQrsByEvent = async (req, res) => {
+    console.log("awo", req.params)
     try {
         const { id } = req.params;
         const qrs = await service.getQrsByEvent(id);

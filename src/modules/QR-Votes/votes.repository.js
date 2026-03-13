@@ -48,7 +48,7 @@ const getQrsByEvent = async (id_event) => {
      ORDER BY qr.id DESC`,
         [id_event]
     );
-    return result.rows;
+    return result.rows[0];
 };
 
 const findExistingVote = async ({ qr_vote_id, voter_ip }) => {
