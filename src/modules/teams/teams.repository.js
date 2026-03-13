@@ -808,6 +808,19 @@ export const createJoinRequest = async (teamId, userId) => {
   try {
     await client.query("BEGIN");
 
+    // First check if user is already a member (most important check)
+    const checkMemberQuery = `
+      SELECT id_team FROM team_coders 
+      WHERE id_team = $1 AND id_user = $2
+    `;
+    const memberResult = await client.query(checkMemberQuery, [teamId, userId]);
+
+    if (memberResult.rows.length > 0) {
+      await client.query("ROLLBACK");
+      throw new ConflictError("Ya eres miembro del equipo");
+    }
+
+    // Then check for existing requests
     const checkExisting = `
       SELECT id_request, status FROM team_join_requests 
       WHERE id_team = $1 AND id_user = $2
@@ -819,30 +832,12 @@ export const createJoinRequest = async (teamId, userId) => {
         await client.query("ROLLBACK");
         throw new ConflictError("Ya existe una solicitud pendiente");
       }
+      // If status is REJECTED, allow creating a new request
       if (existing.rows[0].status === "APPROVED") {
         await client.query("ROLLBACK");
         throw new ConflictError("Ya eres miembro del equipo");
       }
-      const updateQuery = `
-        UPDATE team_join_requests 
-        SET status = 'PENDING', updated_at = NOW()
-        WHERE id_team = $1 AND id_user = $2
-        RETURNING id_request, id_team, id_user, status, created_at
-      `;
-      const result = await client.query(updateQuery, [teamId, userId]);
-      await client.query("COMMIT");
-      return result.rows[0];
-    }
-
-    const checkMemberQuery = `
-      SELECT id_team FROM team_coders 
-      WHERE id_team = $1 AND id_user = $2
-    `;
-    const memberResult = await client.query(checkMemberQuery, [teamId, userId]);
-
-    if (memberResult.rows.length > 0) {
-      await client.query("ROLLBACK");
-      throw new ConflictError("Ya eres miembro del equipo");
+      // If REJECTED, continue to create new request
     }
 
     const query = `
