@@ -99,6 +99,7 @@ export const findAll = async ({
       u.github_avatar_url as leader_avatar_url,
       p.description,
       p.submitted_at,
+      p.preview_photo_url,
       (SELECT COUNT(*) FROM team_coders tc2 WHERE tc2.id_team = t.id_team) as member_count,
       (
         SELECT json_agg(
@@ -118,7 +119,7 @@ export const findAll = async ({
     LEFT JOIN users u ON tc.id_user = u.id_user
     LEFT JOIN projects p ON p.team_id = t.id_team
     ${whereClause}
-    GROUP BY t.id_team, u.id_user, u.name, u.email, u.github_avatar_url, t.created_at, p.description, p.submitted_at
+    GROUP BY t.id_team, u.id_user, u.name, u.email, u.github_avatar_url, t.created_at, p.description, p.submitted_at, p.preview_photo_url
     ORDER BY t.created_at DESC
     LIMIT $${paramIndex++} OFFSET $${paramIndex++}
   `;
