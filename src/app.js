@@ -71,11 +71,6 @@ app.use("/api/emails", emailRoutes);
 // Endpoint to manage QR Votes
 app.use("/api/qr-votes", votesRoutes);
 
-// Endpoint to show the public page where external users can vote
-// app.get('/vote/:eventId', (req, res) => {
-//   res.sendFile(join(__dirname, 'public', 'vote.html'));
-// });
-
 app.use((req, res) => {
   res.status(404).json({ success: false, error: "Endpoint no encontrado" });
 });

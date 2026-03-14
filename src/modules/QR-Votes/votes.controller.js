@@ -1,15 +1,16 @@
-import * as service from './votes.service.js';
+import * as service from './qrVotes.service.js';
 
 // POST /api/qr-votes
 // Admin: crea una sesión de votación y genera el QR
 const createQrVote = async (req, res) => {
     try {
-        const { id_event, expires_at } = req.body;
+        const { id_event, expires_at, top_n } = req.body;
         const created_by = req.user.id_user;
 
         if (!id_event) return res.status(400).json({ error: 'id_event es requerido' });
+        if (!top_n || top_n < 1) return res.status(400).json({ error: 'top_n debe ser un número mayor a 0' });
 
-        const result = await service.createQrVote({ id_event, expires_at, created_by });
+        const result = await service.createQrVote({ id_event, expires_at, created_by, top_n });
         res.status(201).json(result);
     } catch (err) {
         const status = err.status || 500;
@@ -20,10 +21,9 @@ const createQrVote = async (req, res) => {
 // GET /api/qr-votes/event/:eventId
 // Admin: lista todos los QRs de un evento
 const getQrsByEvent = async (req, res) => {
-    console.log("awo", req.params)
     try {
-        const { id } = req.params;
-        const qrs = await service.getQrsByEvent(id);
+        const { eventId } = req.params;
+        const qrs = await service.getQrsByEvent(eventId);
         res.json(qrs);
     } catch (err) {
         const status = err.status || 500;
