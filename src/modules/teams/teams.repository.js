@@ -48,12 +48,12 @@ export const create = async ({ name, leaderId, idEvent = null }) => {
 };
 
 export const findAll = async ({
-  search = null,
-  page = 1,
-  limit = 10,
-  idEvent = null,
-  includeSubmitted = false,
-}) => {
+                                search = null,
+                                page = 1,
+                                limit = 10,
+                                idEvent = null,
+                                includeSubmitted = false,
+                              }) => {
   let whereClauses = [];
   let params = [];
   let paramIndex = 1;
@@ -74,21 +74,21 @@ export const findAll = async ({
   }
 
   const whereClause =
-    whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+      whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
   const offset = (page - 1) * limit;
 
   const countQuery = `
-    SELECT COUNT(*) as total 
+    SELECT COUNT(*) as total
     FROM teams t
-    LEFT JOIN projects p ON p.team_id = t.id_team
-    ${whereClause}
+           LEFT JOIN projects p ON p.team_id = t.id_team
+      ${whereClause}
   `;
   const countResult = await pool.query(countQuery, params);
   const total = parseInt(countResult.rows[0].total, 10);
 
   const query = `
-    SELECT 
+    SELECT
       t.id_team,
       t.name,
       t.id_event,
@@ -102,22 +102,23 @@ export const findAll = async ({
       (SELECT COUNT(*) FROM team_coders tc2 WHERE tc2.id_team = t.id_team) as member_count,
       (
         SELECT json_agg(
-          json_build_object(
-            'id_user', mu.id_user,
-            'name', mu.name,
-            'github_avatar_url', mu.github_avatar_url,
-            'team_role', mtc.team_role
-          ) ORDER BY CASE mtc.team_role WHEN 'LEADER' THEN 1 ELSE 2 END
-        )
+                   json_build_object(
+                       'id_user', mu.id_user,
+                       'name', mu.name,
+                       'github_avatar_url', mu.github_avatar_url,
+                       'team_role', mtc.team_role,
+                       'clan', mu.clan
+                   ) ORDER BY CASE mtc.team_role WHEN 'LEADER' THEN 1 ELSE 2 END
+               )
         FROM team_coders mtc
-        JOIN users mu ON mtc.id_user = mu.id_user
+               JOIN users mu ON mtc.id_user = mu.id_user
         WHERE mtc.id_team = t.id_team
       ) as members
     FROM teams t
-    LEFT JOIN team_coders tc ON t.id_team = tc.id_team AND tc.team_role = 'LEADER'
-    LEFT JOIN users u ON tc.id_user = u.id_user
-    LEFT JOIN projects p ON p.team_id = t.id_team
-    ${whereClause}
+           LEFT JOIN team_coders tc ON t.id_team = tc.id_team AND tc.team_role = 'LEADER'
+           LEFT JOIN users u ON tc.id_user = u.id_user
+           LEFT JOIN projects p ON p.team_id = t.id_team
+      ${whereClause}
     GROUP BY t.id_team, u.id_user, u.name, u.email, u.github_avatar_url, t.created_at, p.description, p.submitted_at
     ORDER BY t.created_at DESC
     LIMIT $${paramIndex++} OFFSET $${paramIndex++}
@@ -139,7 +140,7 @@ export const findAll = async ({
 
 export const findById = async (id) => {
   const query = `
-    SELECT 
+    SELECT
       t.id_team,
       t.name,
       t.id_event,
@@ -148,8 +149,8 @@ export const findById = async (id) => {
       u.name as leader_name,
       u.email as leader_email
     FROM teams t
-    LEFT JOIN team_coders tc ON t.id_team = tc.id_team AND tc.team_role = 'LEADER'
-    LEFT JOIN users u ON tc.id_user = u.id_user
+           LEFT JOIN team_coders tc ON t.id_team = tc.id_team AND tc.team_role = 'LEADER'
+           LEFT JOIN users u ON tc.id_user = u.id_user
     WHERE t.id_team = $1
   `;
 
@@ -159,7 +160,7 @@ export const findById = async (id) => {
 
 export const findByIdWithMembers = async (id) => {
   const teamQuery = `
-    SELECT 
+    SELECT
       t.id_team,
       t.name,
       t.id_event,
@@ -168,8 +169,8 @@ export const findByIdWithMembers = async (id) => {
       lu.name as leader_name,
       lu.email as leader_email
     FROM teams t
-    LEFT JOIN team_coders tc ON t.id_team = tc.id_team AND tc.team_role = 'LEADER'
-    LEFT JOIN users lu ON tc.id_user = lu.id_user
+           LEFT JOIN team_coders tc ON t.id_team = tc.id_team AND tc.team_role = 'LEADER'
+           LEFT JOIN users lu ON tc.id_user = lu.id_user
     WHERE t.id_team = $1
   `;
 
@@ -179,7 +180,7 @@ export const findByIdWithMembers = async (id) => {
   if (!team) return null;
 
   const membersQuery = `
-    SELECT 
+    SELECT
       u.id_user,
       u.name,
       u.email,
@@ -188,15 +189,15 @@ export const findByIdWithMembers = async (id) => {
       tc.team_role,
       p.github_url
     FROM team_coders tc
-    JOIN users u ON tc.id_user = u.id_user
-    LEFT JOIN profiles p ON u.id_user = p.user_id
+           JOIN users u ON tc.id_user = u.id_user
+           LEFT JOIN profiles p ON u.id_user = p.user_id
     WHERE tc.id_team = $1
-    ORDER BY 
+    ORDER BY
       CASE tc.team_role
         WHEN 'LEADER' THEN 1
         WHEN 'DEVELOPER' THEN 2
         ELSE 3
-      END
+        END
   `;
 
   const membersResult = await pool.query(membersQuery, [id]);
@@ -229,8 +230,8 @@ export const remove = async (id) => {
     await client.query("DELETE FROM projects WHERE team_id = $1", [id]);
 
     const result = await client.query(
-      "DELETE FROM teams WHERE id_team = $1 RETURNING id_team",
-      [id],
+        "DELETE FROM teams WHERE id_team = $1 RETURNING id_team",
+        [id],
     );
 
     await client.query("COMMIT");
@@ -267,7 +268,7 @@ export const addMember = async (teamId, userId, teamRole = "DEVELOPER") => {
     }
 
     const checkMembershipQuery = `
-      SELECT id_team FROM team_coders 
+      SELECT id_team FROM team_coders
       WHERE id_team = $1 AND id_user = $2
     `;
     const membershipResult = await client.query(checkMembershipQuery, [
@@ -309,7 +310,7 @@ export const removeMember = async (teamId, userId) => {
     await client.query("BEGIN");
 
     const checkQuery = `
-      SELECT team_role FROM team_coders 
+      SELECT team_role FROM team_coders
       WHERE id_team = $1 AND id_user = $2
     `;
     const checkResult = await client.query(checkQuery, [teamId, userId]);
@@ -325,7 +326,7 @@ export const removeMember = async (teamId, userId) => {
     }
 
     const deleteQuery = `
-      DELETE FROM team_coders 
+      DELETE FROM team_coders
       WHERE id_team = $1 AND id_user = $2
       RETURNING id_team, id_user
     `;
@@ -333,7 +334,7 @@ export const removeMember = async (teamId, userId) => {
     const result = await client.query(deleteQuery, [teamId, userId]);
 
     const deleteInvitationQuery = `
-      DELETE FROM team_invitations 
+      DELETE FROM team_invitations
       WHERE id_team = $1 AND id_user = $2
     `;
     await client.query(deleteInvitationQuery, [teamId, userId]);
@@ -354,7 +355,7 @@ export const removeMember = async (teamId, userId) => {
 
 export const getMyTeams = async (userId) => {
   const query = `
-    SELECT 
+    SELECT
       t.id_team,
       t.name,
       t.created_at,
@@ -363,13 +364,13 @@ export const getMyTeams = async (userId) => {
       u.id_user as leader_id,
       u.name as leader_name,
       (
-        SELECT COUNT(*) FROM team_coders tc2 
+        SELECT COUNT(*) FROM team_coders tc2
         WHERE tc2.id_team = t.id_team
       ) as member_count
     FROM team_coders tc
-    JOIN teams t ON tc.id_team = t.id_team
-    LEFT JOIN team_coders tcl ON t.id_team = tcl.id_team AND tcl.team_role = 'LEADER'
-    LEFT JOIN users u ON tcl.id_user = u.id_user
+           JOIN teams t ON tc.id_team = t.id_team
+           LEFT JOIN team_coders tcl ON t.id_team = tcl.id_team AND tcl.team_role = 'LEADER'
+           LEFT JOIN users u ON tcl.id_user = u.id_user
     WHERE tc.id_user = $1
     ORDER BY t.created_at DESC
   `;
@@ -380,8 +381,8 @@ export const getMyTeams = async (userId) => {
 
 export const isMember = async (teamId, userId) => {
   const query = `
-    SELECT id_team, id_user, team_role 
-    FROM team_coders 
+    SELECT id_team, id_user, team_role
+    FROM team_coders
     WHERE id_team = $1 AND id_user = $2
   `;
 
@@ -391,8 +392,8 @@ export const isMember = async (teamId, userId) => {
 
 export const isLeader = async (teamId, userId) => {
   const query = `
-    SELECT id_team, id_user 
-    FROM team_coders 
+    SELECT id_team, id_user
+    FROM team_coders
     WHERE id_team = $1 AND id_user = $2 AND team_role = 'LEADER'
   `;
 
@@ -401,8 +402,8 @@ export const isLeader = async (teamId, userId) => {
 };
 
 export const getAvailableCoders = async (
-  teamId,
-  { search = null, page = 1, limit = 20 },
+    teamId,
+    { search = null, page = 1, limit = 20 },
 ) => {
   // Get the event this team belongs to, so we exclude only members of teams in the same event
   const teamEventQuery = `SELECT id_event FROM teams WHERE id_team = $1`;
@@ -437,7 +438,7 @@ export const getAvailableCoders = async (
 
   if (search) {
     whereClauses.push(
-      `(u.name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})`,
+        `(u.name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})`,
     );
     params.push(`%${search}%`);
     paramIndex++;
@@ -446,15 +447,15 @@ export const getAvailableCoders = async (
   const offset = (page - 1) * limit;
 
   const countQuery = `
-    SELECT COUNT(*) as total 
-    FROM users u 
+    SELECT COUNT(*) as total
+    FROM users u
     WHERE ${whereClauses.join(" AND ")}
   `;
   const countResult = await pool.query(countQuery, params);
   const total = parseInt(countResult.rows[0].total, 10);
 
   const query = `
-    SELECT 
+    SELECT
       u.id_user,
       u.name,
       u.email,
@@ -462,7 +463,7 @@ export const getAvailableCoders = async (
       p.github_url,
       p.description as profile_description
     FROM users u
-    LEFT JOIN profiles p ON u.id_user = p.user_id
+           LEFT JOIN profiles p ON u.id_user = p.user_id
     WHERE ${whereClauses.join(" AND ")}
     ORDER BY u.name ASC
     LIMIT $${paramIndex++} OFFSET $${paramIndex++}
@@ -484,14 +485,14 @@ export const getAvailableCoders = async (
 
 export const getLeaderWithGithub = async (teamId) => {
   const query = `
-    SELECT 
+    SELECT
       u.id_user,
       u.name,
       u.email,
       u.github_username,
       u.github_token
     FROM team_coders tc
-    JOIN users u ON tc.id_user = u.id_user
+           JOIN users u ON tc.id_user = u.id_user
     WHERE tc.id_team = $1 AND tc.team_role = 'LEADER'
   `;
   const result = await pool.query(query, [teamId]);
@@ -500,7 +501,7 @@ export const getLeaderWithGithub = async (teamId) => {
 
 export const getMemberWithGithub = async (userId) => {
   const query = `
-    SELECT 
+    SELECT
       u.id_user,
       u.name,
       u.email,
@@ -533,7 +534,7 @@ export const getTeamGithubOrg = async (teamId) => {
   const query = `
     SELECT e.github_org
     FROM teams t
-    LEFT JOIN events e ON t.id_event = e.id_event
+           LEFT JOIN events e ON t.id_event = e.id_event
     WHERE t.id_team = $1
   `;
   const result = await pool.query(query, [teamId]);
@@ -544,7 +545,7 @@ export const getTeamEventMaxSize = async (teamId) => {
   const query = `
     SELECT COALESCE(e.max_team_size, 5) as max_team_size
     FROM teams t
-    LEFT JOIN events e ON t.id_event = e.id_event
+           LEFT JOIN events e ON t.id_event = e.id_event
     WHERE t.id_team = $1
   `;
   const result = await pool.query(query, [teamId]);
@@ -552,14 +553,14 @@ export const getTeamEventMaxSize = async (teamId) => {
 };
 
 export const saveTeamProject = async (
-  teamId,
-  { repoName, repoUrl, inviteToken },
+    teamId,
+    { repoName, repoUrl, inviteToken },
 ) => {
   const query = `
     INSERT INTO team_projects (id_team, repo_name, repo_url, github_invite_token)
     VALUES ($1, $2, $3, $4)
-    ON CONFLICT (id_team) 
-    DO UPDATE SET repo_name = $2, repo_url = $3, github_invite_token = $4, updated_at = NOW()
+    ON CONFLICT (id_team)
+      DO UPDATE SET repo_name = $2, repo_url = $3, github_invite_token = $4, updated_at = NOW()
     RETURNING id_project, id_team, repo_name, repo_url
   `;
   const result = await pool.query(query, [
@@ -578,7 +579,7 @@ export const createInvitation = async (teamId, userId, invitedBy) => {
     await client.query("BEGIN");
 
     const checkExistingQuery = `
-      SELECT id_invitation FROM team_invitations 
+      SELECT id_invitation FROM team_invitations
       WHERE id_team = $1 AND id_user = $2 AND status = 'PENDING'
     `;
     const existingResult = await client.query(checkExistingQuery, [
@@ -589,12 +590,12 @@ export const createInvitation = async (teamId, userId, invitedBy) => {
     if (existingResult.rows.length > 0) {
       await client.query("ROLLBACK");
       throw new ConflictError(
-        "Ya existe una invitación pendiente para este usuario",
+          "Ya existe una invitación pendiente para este usuario",
       );
     }
 
     const checkMemberQuery = `
-      SELECT id_team FROM team_coders 
+      SELECT id_team FROM team_coders
       WHERE id_team = $1 AND id_user = $2
     `;
     const memberResult = await client.query(checkMemberQuery, [teamId, userId]);
@@ -608,7 +609,7 @@ export const createInvitation = async (teamId, userId, invitedBy) => {
       INSERT INTO team_invitations (id_team, id_user, invited_by, status)
       VALUES ($1, $2, $3, 'PENDING')
       ON CONFLICT (id_team, id_user)
-      DO UPDATE SET status = 'PENDING', invited_by = $3, updated_at = NOW()
+        DO UPDATE SET status = 'PENDING', invited_by = $3, updated_at = NOW()
       RETURNING id_invitation, id_team, id_user, status, invited_by, created_at
     `;
 
@@ -630,7 +631,7 @@ export const createInvitation = async (teamId, userId, invitedBy) => {
 
 export const getInvitationsByTeam = async (teamId) => {
   const query = `
-    SELECT 
+    SELECT
       i.id_invitation,
       i.id_team,
       i.id_user,
@@ -641,7 +642,7 @@ export const getInvitationsByTeam = async (teamId) => {
       u.email as user_email,
       u.clan as user_clan
     FROM team_invitations i
-    JOIN users u ON i.id_user = u.id_user
+           JOIN users u ON i.id_user = u.id_user
     WHERE i.id_team = $1
     ORDER BY i.created_at DESC
   `;
@@ -651,7 +652,7 @@ export const getInvitationsByTeam = async (teamId) => {
 
 export const getPendingInvitationsByUser = async (userId) => {
   const query = `
-    SELECT 
+    SELECT
       i.id_invitation,
       i.id_team,
       i.id_user,
@@ -663,9 +664,9 @@ export const getPendingInvitationsByUser = async (userId) => {
       lu.name as invited_by_name,
       lu.email as invited_by_email
     FROM team_invitations i
-    JOIN teams t ON i.id_team = t.id_team
-    LEFT JOIN events e ON t.id_event = e.id_event
-    JOIN users lu ON i.invited_by = lu.id_user
+           JOIN teams t ON i.id_team = t.id_team
+           LEFT JOIN events e ON t.id_event = e.id_event
+           JOIN users lu ON i.invited_by = lu.id_user
     WHERE i.id_user = $1 AND i.status = 'PENDING'
     ORDER BY i.created_at DESC
   `;
@@ -675,7 +676,7 @@ export const getPendingInvitationsByUser = async (userId) => {
 
 export const getInvitationById = async (invitationId) => {
   const query = `
-    SELECT 
+    SELECT
       i.id_invitation,
       i.id_team,
       i.id_user,
@@ -687,8 +688,8 @@ export const getInvitationById = async (invitationId) => {
       u.name as user_name,
       u.email as user_email
     FROM team_invitations i
-    JOIN teams t ON i.id_team = t.id_team
-    JOIN users u ON i.id_user = u.id_user
+           JOIN teams t ON i.id_team = t.id_team
+           JOIN users u ON i.id_user = u.id_user
     WHERE i.id_invitation = $1
   `;
   const result = await pool.query(query, [invitationId]);
@@ -702,7 +703,7 @@ export const acceptInvitation = async (invitationId, userId) => {
     await client.query("BEGIN");
 
     const invitationQuery = `
-      SELECT * FROM team_invitations 
+      SELECT * FROM team_invitations
       WHERE id_invitation = $1 AND id_user = $2 AND status = 'PENDING'
     `;
     const invitationResult = await client.query(invitationQuery, [
@@ -752,7 +753,7 @@ export const rejectInvitation = async (invitationId, userId) => {
     await client.query("BEGIN");
 
     const invitationQuery = `
-      SELECT * FROM team_invitations 
+      SELECT * FROM team_invitations
       WHERE id_invitation = $1 AND id_user = $2 AND status = 'PENDING'
     `;
     const invitationResult = await client.query(invitationQuery, [
@@ -791,7 +792,7 @@ export const findLeaderTeam = async (userId, idEvent = null) => {
     const query = `
       SELECT t.id_team, t.name, t.created_at, t.id_event
       FROM teams t
-      JOIN team_coders tc ON t.id_team = tc.id_team
+             JOIN team_coders tc ON t.id_team = tc.id_team
       WHERE tc.id_user = $1 AND tc.team_role = 'LEADER' AND t.id_event = $2
       LIMIT 1
     `;
@@ -802,7 +803,7 @@ export const findLeaderTeam = async (userId, idEvent = null) => {
   const query = `
     SELECT t.id_team, t.name, t.created_at, t.id_event
     FROM teams t
-    JOIN team_coders tc ON t.id_team = tc.id_team
+           JOIN team_coders tc ON t.id_team = tc.id_team
     WHERE tc.id_user = $1 AND tc.team_role = 'LEADER'
     ORDER BY t.created_at DESC
     LIMIT 1
@@ -818,7 +819,7 @@ export const createJoinRequest = async (teamId, userId) => {
 
     // First check if user is already a member (most important check)
     const checkMemberQuery = `
-      SELECT id_team FROM team_coders 
+      SELECT id_team FROM team_coders
       WHERE id_team = $1 AND id_user = $2
     `;
     const memberResult = await client.query(checkMemberQuery, [teamId, userId]);
@@ -830,7 +831,7 @@ export const createJoinRequest = async (teamId, userId) => {
 
     // Then check for existing requests
     const checkExisting = `
-      SELECT id_request, status FROM team_join_requests 
+      SELECT id_request, status FROM team_join_requests
       WHERE id_team = $1 AND id_user = $2
     `;
     const existing = await client.query(checkExisting, [teamId, userId]);
@@ -872,7 +873,7 @@ export const createJoinRequest = async (teamId, userId) => {
 
 export const getJoinRequestsByTeam = async (teamId) => {
   const query = `
-    SELECT 
+    SELECT
       r.id_request,
       r.id_team,
       r.id_user,
@@ -882,7 +883,7 @@ export const getJoinRequestsByTeam = async (teamId) => {
       u.email as user_email,
       u.clan as user_clan
     FROM team_join_requests r
-    JOIN users u ON r.id_user = u.id_user
+           JOIN users u ON r.id_user = u.id_user
     WHERE r.id_team = $1
     ORDER BY r.created_at DESC
   `;
@@ -892,7 +893,7 @@ export const getJoinRequestsByTeam = async (teamId) => {
 
 export const getMyPendingJoinRequests = async (userId) => {
   const query = `
-    SELECT 
+    SELECT
       r.id_request,
       r.id_team,
       r.id_user,
@@ -900,7 +901,7 @@ export const getMyPendingJoinRequests = async (userId) => {
       r.created_at,
       t.name as team_name
     FROM team_join_requests r
-    JOIN teams t ON r.id_team = t.id_team
+           JOIN teams t ON r.id_team = t.id_team
     WHERE r.id_user = $1 AND r.status = 'PENDING'
     ORDER BY r.created_at DESC
   `;
@@ -910,7 +911,7 @@ export const getMyPendingJoinRequests = async (userId) => {
 
 export const getJoinRequestById = async (requestId) => {
   const query = `
-    SELECT 
+    SELECT
       r.id_request,
       r.id_team,
       r.id_user,
@@ -918,7 +919,7 @@ export const getJoinRequestById = async (requestId) => {
       r.created_at,
       t.name as team_name
     FROM team_join_requests r
-    JOIN teams t ON r.id_team = t.id_team
+           JOIN teams t ON r.id_team = t.id_team
     WHERE r.id_request = $1
   `;
   const result = await pool.query(query, [requestId]);
@@ -931,7 +932,7 @@ export const acceptJoinRequest = async (requestId) => {
     await client.query("BEGIN");
 
     const requestQuery = `
-      SELECT * FROM team_join_requests 
+      SELECT * FROM team_join_requests
       WHERE id_request = $1 AND status = 'PENDING'
     `;
     const requestResult = await client.query(requestQuery, [requestId]);
@@ -977,7 +978,7 @@ export const rejectJoinRequest = async (requestId) => {
     await client.query("BEGIN");
 
     const requestQuery = `
-      SELECT * FROM team_join_requests 
+      SELECT * FROM team_join_requests
       WHERE id_request = $1 AND status = 'PENDING'
     `;
     const requestResult = await client.query(requestQuery, [requestId]);
@@ -1012,9 +1013,9 @@ export const isInAnyTeam = async (userId, idEvent = null) => {
   // If an event is provided, only check membership within that event's teams
   if (idEvent) {
     const query = `
-      SELECT tc.id_team 
+      SELECT tc.id_team
       FROM team_coders tc
-      JOIN teams t ON tc.id_team = t.id_team
+             JOIN teams t ON tc.id_team = t.id_team
       WHERE tc.id_user = $1 AND t.id_event = $2
       LIMIT 1
     `;
