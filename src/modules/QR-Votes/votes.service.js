@@ -1,15 +1,15 @@
 import QRCode from 'qrcode';
-import * as repo from './votes.repository.js';
-const PUBLIC_URL = 'https://team-up.crudzaso.com'
+import * as repo from './qrVotes.repository.js';
 
-const createQrVote = async ({ id_event, expires_at, created_by }) => {
-    const votePageUrl = `${PUBLIC_URL}/vote/${id_event}`;
+const createQrVote = async ({ id_event, expires_at, created_by, top_n }) => {
+    const votePageUrl = `${process.env.PUBLIC_URL}/vote/${id_event}`;
 
     const qrVote = await repo.createQrVote({
         qr_code_url: votePageUrl,
         expires_at,
         id_event,
         created_by,
+        top_n,
     });
 
     // Generar imagen QR en base64 para mostrar en el frontend
@@ -19,8 +19,7 @@ const createQrVote = async ({ id_event, expires_at, created_by }) => {
 };
 
 const getQrsByEvent = async (id_event) => {
-    const qrImage = await repo.getQrsByEvent(id_event);
-    return QRCode.toDataURL(qrImage.qr_code_url);
+    return repo.getQrsByEvent(id_event);
 };
 
 const toggleQrActive = async (id) => {
@@ -33,10 +32,12 @@ const getProjectsForVoting = async (id_event) => {
     const activeQr = await repo.getActiveQrByEvent(id_event);
     if (!activeQr) throw { status: 403, message: 'La votación no está activa o ha expirado' };
 
-    const projects = await repo.getProjectsByEvent(id_event);
+    // Usa el top_n guardado en el QR para limitar los proyectos mostrados
+    const projects = await repo.getProjectsByEvent(id_event, activeQr.top_n);
 
     return {
         qr_vote_id: activeQr.id,
+        top_n: activeQr.top_n,
         projects,
     };
 };
