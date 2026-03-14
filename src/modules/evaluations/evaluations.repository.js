@@ -22,7 +22,7 @@ export const getRubricsByEvent = async (eventId) => {
 
 export const getGradesByRubric = async (rubricId) => {
   const query = `
-    SELECT id_grade, id_rubric, score
+    SELECT id_grade, id_rubric, score, name, description
     FROM grades
     WHERE id_rubric = $1
     ORDER BY score DESC
@@ -104,6 +104,8 @@ export const getEvaluationsByProject = async (projectId, evaluatorUserId) => {
       e.created_at,
       e.id_grade,
       g.score,
+      g.name AS grade_name,
+      g.description AS grade_description,
       g.id_rubric,
       u.name AS evaluated_name,
       r.name AS rubric_name,

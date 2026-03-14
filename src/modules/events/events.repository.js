@@ -281,9 +281,9 @@ export const createRubricsWithGrades = async (eventId, rubrics) => {
       const savedGrades = [];
       for (const g of grades) {
         const gRes = await client.query(
-          `INSERT INTO grades (id_rubric, score) VALUES ($1, $2)
-           RETURNING id_grade, id_rubric, score`,
-          [rubricRow.id_rubric, g.score],
+          `INSERT INTO grades (id_rubric, score, name, description) VALUES ($1, $2, $3, $4)
+           RETURNING id_grade, id_rubric, score, name, description`,
+          [rubricRow.id_rubric, g.score, g.name || null, g.description || null],
         );
         savedGrades.push(gRes.rows[0]);
       }
@@ -313,7 +313,7 @@ export const getRubricsForEvent = async (eventId) => {
   if (!rubrics.length) return [];
 
   const gradeRes = await pool.query(
-    `SELECT id_grade, id_rubric, score
+    `SELECT id_grade, id_rubric, score, name, description
      FROM grades
      WHERE id_rubric = ANY($1)
      ORDER BY id_rubric, score DESC`,
