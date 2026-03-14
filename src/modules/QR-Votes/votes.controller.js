@@ -1,4 +1,4 @@
-import * as service from './qrVotes.service.js';
+import * as service from './votes.service.js';
 
 // POST /api/qr-votes
 // Admin: crea una sesión de votación y genera el QR

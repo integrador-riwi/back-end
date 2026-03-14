@@ -1,4 +1,4 @@
-import pool from '../../db/index.js';
+import pool from '../../db/pool.js';
 
 const createQrVote = async ({ qr_code_url, expires_at, id_event, created_by, top_n }) => {
     const result = await pool.query(

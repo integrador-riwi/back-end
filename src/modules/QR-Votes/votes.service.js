@@ -1,5 +1,5 @@
 import QRCode from 'qrcode';
-import * as repo from './qrVotes.repository.js';
+import * as repo from './votes.repository.js';
 
 const createQrVote = async ({ id_event, expires_at, created_by, top_n }) => {
     const votePageUrl = `${process.env.PUBLIC_URL}/vote/${id_event}`;
