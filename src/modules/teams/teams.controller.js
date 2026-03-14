@@ -19,9 +19,15 @@ export const create = asyncHandler(async (req, res) => {
 });
 
 export const list = asyncHandler(async (req, res) => {
-  const { search, page, limit, idEvent } = req.query;
+  const { search, page, limit, idEvent, includeSubmitted } = req.query;
 
-  const result = await TeamsService.listTeams({ search, page, limit, idEvent });
+  const result = await TeamsService.listTeams({
+    search,
+    page,
+    limit,
+    idEvent,
+    includeSubmitted,
+  });
 
   return success(res, result);
 });

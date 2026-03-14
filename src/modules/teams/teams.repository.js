@@ -52,6 +52,7 @@ export const findAll = async ({
   page = 1,
   limit = 10,
   idEvent = null,
+  includeSubmitted = false,
 }) => {
   let whereClauses = [];
   let params = [];
@@ -67,8 +68,10 @@ export const findAll = async ({
     params.push(idEvent);
   }
 
-  // Exclude teams whose project has already been submitted
-  whereClauses.push(`(p.submitted_at IS NULL OR p.id_project IS NULL)`);
+  // Exclude submitted teams unless the caller explicitly requests all (e.g. TL evaluation view)
+  if (!includeSubmitted) {
+    whereClauses.push(`(p.submitted_at IS NULL OR p.id_project IS NULL)`);
+  }
 
   const whereClause =
     whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";

@@ -143,7 +143,7 @@ export const createTeam = async (
 };
 
 export const listTeams = async (query) => {
-  const { search, page, limit, idEvent } = query;
+  const { search, page, limit, idEvent, includeSubmitted } = query;
 
   const pageNum = parseInt(page) || 1;
   const limitNum = parseInt(limit) || 10;
@@ -157,6 +157,7 @@ export const listTeams = async (query) => {
     page: pageNum,
     limit: limitNum,
     idEvent,
+    includeSubmitted: includeSubmitted === "true" || includeSubmitted === true,
   });
 };
 
@@ -411,7 +412,10 @@ export const removeMemberFromTeam = async (
   try {
     emitMemberRemoved(team, memberWithGithub);
   } catch (err) {
-    console.error("[Socket] Error sending member removed notification:", err.message);
+    console.error(
+      "[Socket] Error sending member removed notification:",
+      err.message,
+    );
   }
 
   return member;
