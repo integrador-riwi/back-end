@@ -67,6 +67,9 @@ export const findAll = async ({
     params.push(idEvent);
   }
 
+  // Exclude teams whose project has already been submitted
+  whereClauses.push(`(p.submitted_at IS NULL OR p.id_project IS NULL)`);
+
   const whereClause =
     whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
@@ -74,7 +77,8 @@ export const findAll = async ({
 
   const countQuery = `
     SELECT COUNT(*) as total 
-    FROM teams t 
+    FROM teams t
+    LEFT JOIN projects p ON p.team_id = t.id_team
     ${whereClause}
   `;
   const countResult = await pool.query(countQuery, params);
@@ -91,6 +95,7 @@ export const findAll = async ({
       u.email as leader_email,
       u.github_avatar_url as leader_avatar_url,
       p.description,
+      p.submitted_at,
       (SELECT COUNT(*) FROM team_coders tc2 WHERE tc2.id_team = t.id_team) as member_count,
       (
         SELECT json_agg(
@@ -110,7 +115,7 @@ export const findAll = async ({
     LEFT JOIN users u ON tc.id_user = u.id_user
     LEFT JOIN projects p ON p.team_id = t.id_team
     ${whereClause}
-    GROUP BY t.id_team, u.id_user, u.name, u.email, u.github_avatar_url, t.created_at, p.description
+    GROUP BY t.id_team, u.id_user, u.name, u.email, u.github_avatar_url, t.created_at, p.description, p.submitted_at
     ORDER BY t.created_at DESC
     LIMIT $${paramIndex++} OFFSET $${paramIndex++}
   `;
