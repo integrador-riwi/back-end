@@ -14,6 +14,7 @@ router.get('/stats', authenticate, hasRole('ADMIN'), usersController.getStats);
 router.get('/', authenticate, hasRole('ADMIN'), usersController.list);
 
 router.get('/:id', authenticate, hasRole('ADMIN'), usersController.get);
+router.get('/:id/profile', authenticate, usersController.getPublicProfile);
 
 router.post('/', authenticate, hasRole('ADMIN'), usersController.create);
 

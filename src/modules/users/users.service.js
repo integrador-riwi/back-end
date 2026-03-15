@@ -184,6 +184,27 @@ export const getUserStats = async () => {
   return stats;
 };
 
+export const getPublicProfile = async (userId, viewerRole) => {
+  const user = await UsersRepository.findById(userId);
+
+  if (!user) {
+    throw new NotFoundError("Usuario no encontrado");
+  }
+
+  // If viewer is CODER, they only see submitted projects.
+  // ADMIN and TLs (DEVELOPMENT, SOFT_SKILLS, ENGLISH) see all projects.
+  const onlySubmitted = viewerRole === "CODER";
+  const projects = await UsersRepository.findProjectsByUserId(
+    userId,
+    onlySubmitted,
+  );
+
+  return {
+    ...user,
+    projects,
+  };
+};
+
 export default {
   listUsers,
   getUser,
@@ -193,5 +214,6 @@ export default {
   toggleUserStatus,
   getAvailableCoders,
   getMe,
-  getUserStats
+  getUserStats,
+  getPublicProfile,
 };

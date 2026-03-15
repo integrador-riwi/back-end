@@ -380,6 +380,41 @@ export const getStats = async () => {
   return result.rows[0];
 };
 
+export const findProjectsByUserId = async (userId, onlySubmitted = false) => {
+  let query = `
+    SELECT 
+      p.id_project,
+      p.name,
+      p.description,
+      p.team_id,
+      p.id_event,
+      p.repo_url,
+      p.video_url,
+      p.presentation_url,
+      p.preview_photo_url,
+      p.deploy_url,
+      p.submitted_at,
+      p.created_at,
+      p.project_final_grade,
+      t.name as team_name,
+      e.event_name
+    FROM projects p
+    JOIN teams t ON p.team_id = t.id_team
+    JOIN team_coders tc ON t.id_team = tc.id_team
+    LEFT JOIN events e ON p.id_event = e.id_event
+    WHERE tc.id_user = $1
+  `;
+
+  if (onlySubmitted) {
+    query += " AND p.submitted_at IS NOT NULL";
+  }
+
+  query += " ORDER BY p.created_at DESC";
+
+  const result = await pool.query(query, [userId]);
+  return result.rows;
+};
+
 export default {
   findAll,
   findById,
@@ -391,5 +426,6 @@ export default {
   toggleStatus,
   findAvailableCoders,
   count,
-  getStats
+  getStats,
+  findProjectsByUserId
 };

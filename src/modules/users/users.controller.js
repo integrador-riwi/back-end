@@ -135,6 +135,22 @@ export const getStats = async (req, res, next) => {
   }
 };
 
+export const getPublicProfile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const viewerRole = req.user.role;
+
+    const profile = await usersService.getPublicProfile(id, viewerRole);
+
+    return success(res, {
+      message: "Perfil público obtenido exitosamente",
+      data: profile,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default {
   list,
   get,
@@ -144,5 +160,6 @@ export default {
   toggleStatus,
   getAvailable,
   getMe,
-  getStats
+  getStats,
+  getPublicProfile,
 };

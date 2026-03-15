@@ -48,12 +48,12 @@ export const create = async ({ name, leaderId, idEvent = null }) => {
 };
 
 export const findAll = async ({
-                                search = null,
-                                page = 1,
-                                limit = 10,
-                                idEvent = null,
-                                includeSubmitted = false,
-                              }) => {
+  search = null,
+  page = 1,
+  limit = 10,
+  idEvent = null,
+  includeSubmitted = false,
+}) => {
   let whereClauses = [];
   let params = [];
   let paramIndex = 1;
@@ -74,7 +74,7 @@ export const findAll = async ({
   }
 
   const whereClause =
-      whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+    whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
   const offset = (page - 1) * limit;
 
@@ -231,8 +231,8 @@ export const remove = async (id) => {
     await client.query("DELETE FROM projects WHERE team_id = $1", [id]);
 
     const result = await client.query(
-        "DELETE FROM teams WHERE id_team = $1 RETURNING id_team",
-        [id],
+      "DELETE FROM teams WHERE id_team = $1 RETURNING id_team",
+      [id],
     );
 
     await client.query("COMMIT");
@@ -403,8 +403,8 @@ export const isLeader = async (teamId, userId) => {
 };
 
 export const getAvailableCoders = async (
-    teamId,
-    { search = null, page = 1, limit = 20 },
+  teamId,
+  { search = null, page = 1, limit = 20 },
 ) => {
   // Get the event this team belongs to, so we exclude only members of teams in the same event
   const teamEventQuery = `SELECT id_event FROM teams WHERE id_team = $1`;
@@ -439,7 +439,7 @@ export const getAvailableCoders = async (
 
   if (search) {
     whereClauses.push(
-        `(u.name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})`,
+      `(u.name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})`,
     );
     params.push(`%${search}%`);
     paramIndex++;
@@ -554,8 +554,8 @@ export const getTeamEventMaxSize = async (teamId) => {
 };
 
 export const saveTeamProject = async (
-    teamId,
-    { repoName, repoUrl, inviteToken },
+  teamId,
+  { repoName, repoUrl, inviteToken },
 ) => {
   const query = `
     INSERT INTO team_projects (id_team, repo_name, repo_url, github_invite_token)
@@ -591,7 +591,7 @@ export const createInvitation = async (teamId, userId, invitedBy) => {
     if (existingResult.rows.length > 0) {
       await client.query("ROLLBACK");
       throw new ConflictError(
-          "Ya existe una invitación pendiente para este usuario",
+        "Ya existe una invitación pendiente para este usuario",
       );
     }
 
