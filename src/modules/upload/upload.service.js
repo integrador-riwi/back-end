@@ -4,10 +4,8 @@ import { ValidationError, NotFoundError } from "../../middleware/errorHandler.js
 const ALLOWED_RESOURCE_TYPES = ["image", "video"];
 const DEFAULT_FOLDER = "teamup_projects";
 
-// ─────────────────────────────────────────────────────────────
 // Generates a signature so the client can upload directly to
 // Cloudinary without exposing the api_secret.
-// ─────────────────────────────────────────────────────────────
 export const generateSignature = ({ folder, resource_type }) => {
     const resolvedFolder = folder ?? DEFAULT_FOLDER;
     const resolvedType = resource_type ?? "image";
@@ -42,10 +40,8 @@ export const generateSignature = ({ folder, resource_type }) => {
     };
 };
 
-// ─────────────────────────────────────────────────────────────
 // Verifies that a file actually exists in Cloudinary
 // after the client has uploaded it directly.
-// ─────────────────────────────────────────────────────────────
 export const verifyUpload = async ({ public_id, secure_url, resource_type }) => {
     if (!public_id || !secure_url) {
         throw new ValidationError("public_id and secure_url are required.");
