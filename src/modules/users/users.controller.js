@@ -142,10 +142,7 @@ export const getPublicProfile = async (req, res, next) => {
 
     const profile = await usersService.getPublicProfile(id, viewerRole);
 
-    return success(res, {
-      message: "Perfil público obtenido exitosamente",
-      data: profile,
-    });
+    return success(res, profile);
   } catch (error) {
     next(error);
   }

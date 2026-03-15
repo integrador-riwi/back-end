@@ -81,6 +81,7 @@ export const findById = async (id) => {
       u.document_type,
       u.clan,
       u.is_active,
+      u.github_avatar_url,
       p.github_url,
       p.description as profile_description
     FROM users u
