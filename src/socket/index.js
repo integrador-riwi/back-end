@@ -1,6 +1,8 @@
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 
+let _io = null;
+
 const connectedUsers = new Map();
 
 export function initializeSocket(server) {
@@ -11,6 +13,8 @@ export function initializeSocket(server) {
       credentials: true
     }
   });
+
+  _io = io;
 
   io.use((socket, next) => {
     const token = socket.handshake.auth.token || socket.handshake.query.token;
@@ -52,6 +56,10 @@ export function initializeSocket(server) {
   });
 
   return io;
+}
+
+export function getIO() {
+  return _io;
 }
 
 export function sendNotificationToUser(io, userId, event, data) {

@@ -1,4 +1,5 @@
 import * as service from './votes.service.js';
+import { getIO } from '../../socket/index.js';
 
 // POST /api/qr-votes
 // Admin: crea una sesión de votación y genera el QR
@@ -60,19 +61,26 @@ const getProjectsForVoting = async (req, res) => {
 // POST /api/vote
 // Público: registra el voto de una persona externa
 const registerVote = async (req, res) => {
-    try {
-        const { qr_vote_id, project_id } = req.body;
-        const voter_ip = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
+  try {
+    const { qr_vote_id, project_id } = req.body;
+    const voter_ip = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
 
-        if (!qr_vote_id || !project_id)
-            return res.status(400).json({ error: 'qr_vote_id y project_id son requeridos' });
+    if (!qr_vote_id || !project_id)
+      return res.status(400).json({ error: 'qr_vote_id y project_id son requeridos' });
 
-        const vote = await service.registerVote({ qr_vote_id, project_id, voter_ip });
-        res.status(201).json({ success: true, message: '¡Voto registrado exitosamente!', vote });
-    } catch (err) {
-        const status = err.status || 500;
-        res.status(status).json({ error: err.message || 'Error al registrar voto' });
+    const vote = await service.registerVote({ qr_vote_id, project_id, voter_ip });
+
+    const io = getIO();
+    if (io) {
+      io.emit("vote:new", { qr_vote_id, project_id, vote });
     }
+
+    res.status(201).json({ success: true, message: '¡Voto registrado exitosamente!', vote });
+
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || 'Error al registrar voto' });
+  }
 };
 
 // GET /api/qr-votes/event/:eventId/results
