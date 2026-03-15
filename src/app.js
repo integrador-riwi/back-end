@@ -62,16 +62,14 @@ app.use("/api/teams", teamsRoutes);
 app.use("/api/projects", projectsRoutes);
 app.use("/api/events", eventsRoutes);
 app.use("/api/events/:eventId/ranking", rankingRoutes);
-app.use("/api/events/:eventId/finalists", finalistsRoutes);
+app.use("/api/finalists", finalistsRoutes);
 app.use("/api/comments", commentsRoutes);
 app.use("/api/evaluations", evaluationsRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/qr-votes", votesRoutes);
 
 // Endpoint to send emails u
 app.use("/api/emails", emailRoutes);
-
-// Endpoint to manage QR Votes
-app.use("/api/qr-votes", votesRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, error: "Endpoint no encontrado" });

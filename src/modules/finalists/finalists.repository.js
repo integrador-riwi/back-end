@@ -1,117 +1,171 @@
-import pool from "../../db/pool.js";
+import pool from '../../db/pool.js';
+
+export const getEventById = async (eventId) => {
+  const result = await pool.query(
+      `SELECT id_event, event_name, title, event_status, status
+     FROM events
+     WHERE id_event = $1`,
+      [eventId],
+  );
+  return result.rows[0] ?? null;
+};
 
 export const getFinalistsByEvent = async (eventId) => {
-  const query = `
-    SELECT
-      f.id_finalist,
-      f.id_project,
-      f.event_id,
-      f.second_grade,
-      f.votes_result,
-      f.final_grade,
-      p.name AS project_name,
-      p.repo_url,
-      p.preview_photo_url,
-      p.video_url,
-      p.presentation_url,
-      t.id_team,
-      t.name AS team_name
-    FROM finalists f
-    JOIN projects p ON p.id_project = f.id_project
-    JOIN teams t ON t.id_team = p.team_id
-    WHERE f.event_id = $1
-    ORDER BY f.final_grade DESC NULLS LAST
-  `;
-  const result = await pool.query(query, [eventId]);
+  const result = await pool.query(
+      `SELECT
+       f.id_finalist,
+       f.id_project,
+       f.event_id,
+       f.second_grade,
+       f.votes_result,
+       f.votes_count,
+       f.final_grade,
+       p.name             AS project_name,
+       p.repo_url,
+       p.preview_photo_url,
+       p.video_url,
+       p.presentation_url,
+       p.deploy_url,
+       t.id_team,
+       t.name             AS team_name
+     FROM finalists f
+     JOIN projects p ON p.id_project = f.id_project
+     JOIN teams t    ON t.id_team    = p.team_id
+     WHERE f.event_id = $1
+     ORDER BY f.final_grade DESC NULLS LAST`,
+      [eventId],
+  );
   return result.rows;
 };
 
 export const getFinalistsCountByEvent = async (eventId) => {
-  const query = `
-    SELECT COUNT(*)::int AS count
-    FROM finalists
-    WHERE event_id = $1
-  `;
-  const result = await pool.query(query, [eventId]);
+  const result = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM finalists WHERE event_id = $1`,
+      [eventId],
+  );
   return result.rows[0].count;
+};
+
+// Returns all projects for an event with their average score from individual_project_results.
+// This is the same source used by the ranking module.
+export const getTopProjectsByScore = async (eventId, limit = 3) => {
+  const result = await pool.query(
+      `SELECT
+       p.id_project,
+       p.name                                  AS project_name,
+       t.id_team,
+       t.name                                  AS team_name,
+       ROUND(AVG(ipr.final_score)::numeric, 4) AS team_score
+     FROM individual_project_results ipr
+     JOIN projects p ON p.id_project = ipr.project_id
+     JOIN teams t    ON t.id_team    = p.team_id
+     WHERE p.id_event = $1
+     GROUP BY p.id_project, p.name, t.id_team, t.name
+     ORDER BY team_score DESC
+     LIMIT $2`,
+      [eventId, limit],
+  );
+  return result.rows;
+};
+
+export const getVoteCountsByEvent = async (eventId) => {
+  const result = await pool.query(
+      `SELECT
+       pv.project_id,
+       COUNT(pv.id_vote)::integer AS votes_count
+     FROM public_votes pv
+     JOIN qr_votes qr ON qr.id = pv.qr_vote_id
+     WHERE qr.id_event = $1
+     GROUP BY pv.project_id`,
+      [eventId],
+  );
+  return result.rows;
+};
+
+// Inserts the calculated finalists and closes the event in a single atomic transaction.
+export const saveFinalistsAndCloseEvent = async (eventId, finalists) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const inserted = [];
+    for (const f of finalists) {
+      const { rows } = await client.query(
+          `INSERT INTO finalists
+           (id_project, event_id, second_grade, votes_result, votes_count, final_grade)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+          [f.id_project, eventId, f.second_grade, f.votes_result, f.votes_count, f.final_grade],
+      );
+      inserted.push(rows[0]);
+    }
+
+    await client.query(
+        `UPDATE events
+       SET event_status = 'FINISHED',
+           status       = 'FINISHED',
+           updated_at   = now()
+       WHERE id_event = $1`,
+        [eventId],
+    );
+
+    await client.query('COMMIT');
+    return inserted;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 export const setFinalists = async (eventId, projectIds, secondGrades = null) => {
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
-
-    await client.query(
-      `DELETE FROM finalists WHERE event_id = $1`,
-      [eventId]
-    );
-
+    await client.query('BEGIN');
+    await client.query(`DELETE FROM finalists WHERE event_id = $1`, [eventId]);
     for (let i = 0; i < projectIds.length; i++) {
-      const projectId = projectIds[i];
-      const secondGrade = secondGrades ? secondGrades[i] : null;
-      
       await client.query(
-        `INSERT INTO finalists (id_project, event_id, second_grade)
+          `INSERT INTO finalists (id_project, event_id, second_grade)
          VALUES ($1, $2, $3)`,
-        [projectId, eventId, secondGrade]
+          [projectIds[i], eventId, secondGrades ? secondGrades[i] : null],
       );
     }
-
-    await client.query("COMMIT");
+    await client.query('COMMIT');
     return true;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
   } finally {
     client.release();
   }
 };
 
 export const updateFinalistVotes = async (finalistId, votesResult) => {
-  const query = `
-    UPDATE finalists
-    SET votes_result = $1
-    WHERE id_finalist = $2
-    RETURNING *
-  `;
-  const result = await pool.query(query, [votesResult, finalistId]);
+  const result = await pool.query(
+      `UPDATE finalists SET votes_result = $1 WHERE id_finalist = $2 RETURNING *`,
+      [votesResult, finalistId],
+  );
   return result.rows[0];
 };
 
 export const updateFinalistFinalGrade = async (finalistId, finalGrade) => {
-  const query = `
-    UPDATE finalists
-    SET final_grade = $1
-    WHERE id_finalist = $2
-    RETURNING *
-  `;
-  const result = await pool.query(query, [finalGrade, finalistId]);
+  const result = await pool.query(
+      `UPDATE finalists SET final_grade = $1 WHERE id_finalist = $2 RETURNING *`,
+      [finalGrade, finalistId],
+  );
   return result.rows[0];
 };
 
-export const getTopProjectsFromRanking = async (eventId, count = 3) => {
-  const query = `
-    SELECT
-      p.id_project,
-      p.name AS project_name,
-      t.id_team,
-      t.name AS team_name,
-      ROUND(AVG(ipr.final_score)::numeric, 2) AS team_score
-    FROM individual_project_results ipr
-    JOIN projects p ON p.id_project = ipr.project_id
-    JOIN teams t ON t.id_team = p.team_id
-    WHERE p.id_event = $1
-    GROUP BY p.id_project, p.name, t.id_team, t.name
-    ORDER BY team_score DESC
-    LIMIT $2
-  `;
-  const result = await pool.query(query, [eventId, count]);
-  return result.rows;
-};
+export const getTopProjectsFromRanking = getTopProjectsByScore;
 
 export default {
+  getEventById,
   getFinalistsByEvent,
   getFinalistsCountByEvent,
+  getTopProjectsByScore,
+  getVoteCountsByEvent,
+  saveFinalistsAndCloseEvent,
   setFinalists,
   updateFinalistVotes,
   updateFinalistFinalGrade,
