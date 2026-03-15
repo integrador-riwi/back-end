@@ -12,27 +12,27 @@ export const findAll = async ({ search = null, page = 1, limit = 10 }) => {
 
   if (search) {
     whereClauses.push(
-      `p.name ILIKE $${paramIndex++} OR t.name ILIKE $${paramIndex++}`,
+        `p.name ILIKE $${paramIndex++} OR t.name ILIKE $${paramIndex++}`,
     );
     params.push(`%${search}%`, `%${search}%`);
   }
 
   const whereClause =
-    whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+      whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
   const offset = (page - 1) * limit;
 
   const countQuery = `
-    SELECT COUNT(*) as total 
+    SELECT COUNT(*) as total
     FROM projects p
-    JOIN teams t ON p.team_id = t.id_team
-    ${whereClause}
+           JOIN teams t ON p.team_id = t.id_team
+      ${whereClause}
   `;
   const countResult = await pool.query(countQuery, params);
   const total = parseInt(countResult.rows[0].total, 10);
 
   const query = `
-    SELECT 
+    SELECT
       p.id_project,
       p.name,
       p.description,
@@ -50,14 +50,14 @@ export const findAll = async ({ search = null, page = 1, limit = 10 }) => {
       u.name as leader_name,
       u.email as leader_email,
       (
-        SELECT COUNT(*) FROM team_coders tc2 
+        SELECT COUNT(*) FROM team_coders tc2
         WHERE tc2.id_team = t.id_team
       ) as member_count
     FROM projects p
-    JOIN teams t ON p.team_id = t.id_team
-    LEFT JOIN team_coders tc ON t.id_team = tc.id_team AND tc.team_role = 'LEADER'
-    LEFT JOIN users u ON tc.id_user = u.id_user
-    ${whereClause}
+           JOIN teams t ON p.team_id = t.id_team
+           LEFT JOIN team_coders tc ON t.id_team = tc.id_team AND tc.team_role = 'LEADER'
+           LEFT JOIN users u ON tc.id_user = u.id_user
+      ${whereClause}
     ORDER BY p.created_at DESC
     LIMIT $${paramIndex++} OFFSET $${paramIndex++}
   `;
@@ -78,7 +78,7 @@ export const findAll = async ({ search = null, page = 1, limit = 10 }) => {
 
 export const findById = async (id) => {
   const query = `
-    SELECT 
+    SELECT
       p.id_project,
       p.name,
       p.description,
@@ -98,9 +98,9 @@ export const findById = async (id) => {
       u.name as leader_name,
       u.email as leader_email
     FROM projects p
-    JOIN teams t ON p.team_id = t.id_team
-    LEFT JOIN team_coders tc ON t.id_team = tc.id_team AND tc.team_role = 'LEADER'
-    LEFT JOIN users u ON tc.id_user = u.id_user
+           JOIN teams t ON p.team_id = t.id_team
+           LEFT JOIN team_coders tc ON t.id_team = tc.id_team AND tc.team_role = 'LEADER'
+           LEFT JOIN users u ON tc.id_user = u.id_user
     WHERE p.id_project = $1
   `;
 
@@ -110,7 +110,7 @@ export const findById = async (id) => {
 
 export const findByTeamId = async (teamId) => {
   const query = `
-    SELECT 
+    SELECT
       p.id_project,
       p.name,
       p.description,
@@ -127,7 +127,7 @@ export const findByTeamId = async (teamId) => {
       p.created_at,
       t.name as team_name
     FROM projects p
-    JOIN teams t ON p.team_id = t.id_team
+           JOIN teams t ON p.team_id = t.id_team
     WHERE p.team_id = $1
   `;
 
@@ -136,7 +136,6 @@ export const findByTeamId = async (teamId) => {
 };
 
 // Single query: project + leader identity check + github token
-// Replaces the triple roundtrip of findById + isLeaderOfTeamByProjectId + getMemberWithGithub
 export const findByIdWithLeaderGithub = async (projectId, userId) => {
   const query = `
     SELECT
@@ -153,19 +152,18 @@ export const findByIdWithLeaderGithub = async (projectId, userId) => {
       p.submitted_at,
       p.created_at,
       t.name as team_name,
-      -- leader check: non-null only when userId IS the leader
       tc.team_role,
       u.id_user    as leader_id,
       u.github_username,
       u.github_token
     FROM projects p
-    JOIN teams t ON p.team_id = t.id_team
-    LEFT JOIN team_coders tc
-      ON tc.id_team = t.id_team
-     AND tc.id_user = $2
-     AND tc.team_role = 'LEADER'
-    LEFT JOIN users u
-      ON u.id_user = tc.id_user
+           JOIN teams t ON p.team_id = t.id_team
+           LEFT JOIN team_coders tc
+                     ON tc.id_team = t.id_team
+                       AND tc.id_user = $2
+                       AND tc.team_role = 'LEADER'
+           LEFT JOIN users u
+                     ON u.id_user = tc.id_user
     WHERE p.id_project = $1
   `;
 
@@ -191,15 +189,15 @@ export const findByIdWithLeaderGithub = async (projectId, userId) => {
     },
     isLeader: row.team_role === "LEADER",
     leaderGithub: row.leader_id
-      ? { github_username: row.github_username, github_token: row.github_token }
-      : null,
+        ? { github_username: row.github_username, github_token: row.github_token }
+        : null,
   };
 };
 
 export const update = async (id, { name, description, repoUrl }) => {
   const query = `
     UPDATE projects
-    SET 
+    SET
       name = COALESCE($1, name),
       description = COALESCE($2, description),
       repo_url = COALESCE($3, repo_url)
@@ -211,9 +209,18 @@ export const update = async (id, { name, description, repoUrl }) => {
   return result.rows[0] || null;
 };
 
+// Updates only the embedding vector for a project.
+export const updateEmbedding = async (id, embeddingArray) => {
+  const vectorString = `[${embeddingArray.join(",")}]`;
+  await pool.query(
+      `UPDATE projects SET embedding = $1::vector WHERE id_project = $2`,
+      [vectorString, id],
+  );
+};
+
 export const updateDeliverables = async (
-  id,
-  { videoUrl, presentationUrl, previewPhotoUrl, deployUrl },
+    id,
+    { videoUrl, presentationUrl, previewPhotoUrl, deployUrl },
 ) => {
   const query = `
     UPDATE projects
@@ -281,7 +288,7 @@ export const create = async (teamId, { name, description, idEvent = null }) => {
 
 export const findByTeamIdWithMembers = async (teamId) => {
   const query = `
-    SELECT 
+    SELECT
       p.id_project,
       p.name,
       p.description,
@@ -301,9 +308,9 @@ export const findByTeamIdWithMembers = async (teamId) => {
       u.name as leader_name,
       u.email as leader_email
     FROM projects p
-    JOIN teams t ON p.team_id = t.id_team
-    LEFT JOIN team_coders tc ON t.id_team = tc.id_team AND tc.team_role = 'LEADER'
-    LEFT JOIN users u ON tc.id_user = u.id_user
+           JOIN teams t ON p.team_id = t.id_team
+           LEFT JOIN team_coders tc ON t.id_team = tc.id_team AND tc.team_role = 'LEADER'
+           LEFT JOIN users u ON tc.id_user = u.id_user
     WHERE p.team_id = $1
   `;
 
@@ -332,7 +339,7 @@ export const isMemberOfTeam = async (projectId, userId) => {
   const query = `
     SELECT tc.id_team, tc.team_role
     FROM projects p
-    JOIN team_coders tc ON p.team_id = tc.id_team
+           JOIN team_coders tc ON p.team_id = tc.id_team
     WHERE p.id_project = $1 AND tc.id_user = $2
   `;
 
@@ -360,6 +367,7 @@ export default {
   findByIdWithLeaderGithub,
   create,
   update,
+  updateEmbedding,
   updateDeliverables,
   submitProject,
   isSubmitted,

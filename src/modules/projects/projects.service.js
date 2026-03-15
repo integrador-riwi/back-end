@@ -1,12 +1,17 @@
+import pool from "../../db/pool.js";
 import ProjectsRepository from "./projects.repository.js";
 import TeamsRepository from "../teams/teams.repository.js";
 import n8nService from "../../integrations/n8n.service.js";
+import { searchProjectByDescription } from "../../integrations/Google AI/searchService.js";
+import { generarEmbedding } from "../../integrations/Google AI/embeddingService.js";
 import {
   NotFoundError,
   ForbiddenError,
   ValidationError,
   ConflictError,
 } from "../../middleware/errorHandler.js";
+
+const SEMANTIC_SIMILARITY_THRESHOLD = 0.3;
 
 export const listProjects = async (query) => {
   const { search, page, limit } = query;
@@ -19,6 +24,22 @@ export const listProjects = async (query) => {
   }
 
   return ProjectsRepository.findAll({ search, page: pageNum, limit: limitNum });
+};
+
+// Semantic search against project descriptions using vector similarity.
+// Only returns projects with similarity >= SEMANTIC_SIMILARITY_THRESHOLD (0.3).
+// Optionally filtered by eventId.
+export const searchProjectsSemantic = async (query, limit = 20, eventId = null) => {
+  if (!query || query.trim().length === 0) {
+    throw new ValidationError("Search query cannot be empty");
+  }
+  return searchProjectByDescription(
+      query.trim(),
+      limit,
+      SEMANTIC_SIMILARITY_THRESHOLD,
+      null,
+      eventId,
+  );
 };
 
 export const getProjectById = async (id, userId, userRole) => {
@@ -63,8 +84,8 @@ export const updateProject = async (id, data, userId, userRole) => {
   }
 
   const isLeader = await ProjectsRepository.isLeaderOfTeamByProjectId(
-    id,
-    userId,
+      id,
+      userId,
   );
   const isAdmin = userRole === "ADMIN";
 
@@ -78,7 +99,7 @@ export const updateProject = async (id, data, userId, userRole) => {
     }
     if (data.name.length > 200) {
       throw new ValidationError(
-        "El nombre del proyecto no puede exceder 200 caracteres",
+          "El nombre del proyecto no puede exceder 200 caracteres",
       );
     }
   }
@@ -88,6 +109,21 @@ export const updateProject = async (id, data, userId, userRole) => {
     description: data.description?.trim(),
     repoUrl: data.repoUrl,
   });
+
+  // Regenerate the embedding whenever the description changes.
+  // Fire-and-forget: don't block the response if the embedding API fails.
+  const descriptionChanged =
+      data.description !== undefined &&
+      data.description?.trim() !== project.description?.trim();
+
+  if (descriptionChanged && updatedProject?.description) {
+    const textToEmbed = `${updatedProject.name}. ${updatedProject.description}`;
+    generarEmbedding(textToEmbed)
+        .then((vector) => ProjectsRepository.updateEmbedding(id, vector))
+        .catch((err) =>
+            console.error(`[updateProject] Failed to update embedding for project ${id}:`, err.message),
+        );
+  }
 
   return updatedProject;
 };
@@ -101,19 +137,19 @@ export const updateDeliverables = async (id, data, userId, userRole) => {
 
   if (project.submitted_at) {
     throw new ForbiddenError(
-      "El proyecto ya fue entregado y no puede ser modificado",
+        "El proyecto ya fue entregado y no puede ser modificado",
     );
   }
 
   const isLeader = await ProjectsRepository.isLeaderOfTeamByProjectId(
-    id,
-    userId,
+      id,
+      userId,
   );
   const isAdmin = userRole === "ADMIN";
 
   if (!isLeader && !isAdmin) {
     throw new ForbiddenError(
-      "No tienes permiso para editar los entregables de este proyecto",
+        "No tienes permiso para editar los entregables de este proyecto",
     );
   }
 
@@ -148,7 +184,6 @@ export const updateDeliverables = async (id, data, userId, userRole) => {
 export const submitProject = async (id, userId, userRole) => {
   const isAdmin = userRole === "ADMIN";
 
-  // Single DB roundtrip: project data + leader check + github token
   const row = await ProjectsRepository.findByIdWithLeaderGithub(id, userId);
 
   if (!row) {
@@ -163,7 +198,7 @@ export const submitProject = async (id, userId, userRole) => {
 
   if (!isLeader && !isAdmin) {
     throw new ForbiddenError(
-      "Solo el líder del equipo puede entregar el proyecto",
+        "Solo el líder del equipo puede entregar el proyecto",
     );
   }
 
@@ -175,25 +210,23 @@ export const submitProject = async (id, userId, userRole) => {
 
   if (missingFields.length > 0) {
     throw new ValidationError(
-      `Faltan los siguientes entregables: ${missingFields.join(", ")}`,
+        `Faltan los siguientes entregables: ${missingFields.join(", ")}`,
     );
   }
 
   const submitted = await ProjectsRepository.submitProject(id);
 
-  // Trigger n8n: make the GitHub repo public (non-blocking)
   try {
     if (leaderGithub?.github_token) {
       const repoName =
-        project.repo_url?.split("/").filter(Boolean).pop() ?? null;
+          project.repo_url?.split("/").filter(Boolean).pop() ?? null;
 
-      // Get github_org and org token from the event
       let githubOrg = null;
       let orgToken = null;
       if (project.id_event) {
         try {
           const { findById: findEvent } =
-            await import("../events/events.repository.js");
+              await import("../events/events.repository.js");
           const event = await findEvent(project.id_event);
           githubOrg = event?.github_org ?? null;
           orgToken = event?.github_org_token ?? null;
@@ -201,21 +234,21 @@ export const submitProject = async (id, userId, userRole) => {
       }
 
       await n8nService.triggerProjectSubmitted(
-        {
-          id: project.id_project,
-          repoName,
-          repoUrl: project.repo_url,
-          githubOrg,
-          orgToken,
-        },
-        {
-          githubUsername: leaderGithub.github_username,
-          githubToken: orgToken ?? leaderGithub.github_token,
-        },
+          {
+            id: project.id_project,
+            repoName,
+            repoUrl: project.repo_url,
+            githubOrg,
+            orgToken,
+          },
+          {
+            githubUsername: leaderGithub.github_username,
+            githubToken: orgToken ?? leaderGithub.github_token,
+          },
       );
     } else {
       console.warn(
-        `[submitProject] Leader ${userId} has no github_token — skipping repo visibility automation`,
+          `[submitProject] Leader ${userId} has no github_token — skipping repo visibility automation`,
       );
     }
   } catch (err) {
@@ -248,7 +281,7 @@ export const createProject = async (teamId, data, userId, userRole) => {
 
   if (data.name.length > 200) {
     throw new ValidationError(
-      "El nombre del proyecto no puede exceder 200 caracteres",
+        "El nombre del proyecto no puede exceder 200 caracteres",
     );
   }
 
@@ -256,17 +289,16 @@ export const createProject = async (teamId, data, userId, userRole) => {
 
   if (!leaderWithGithub || !leaderWithGithub.github_username) {
     throw new ValidationError(
-      "Debes tener GitHub conectado para crear un proyecto",
+        "Debes tener GitHub conectado para crear un proyecto",
     );
   }
 
   if (!leaderWithGithub.github_token) {
     throw new ValidationError(
-      "Tu token de GitHub no está disponible. Por favor, reconnécta tu cuenta.",
+        "Tu token de GitHub no está disponible. Por favor, reconnécta tu cuenta.",
     );
   }
 
-  // Fetch the team to get its id_event so the project is linked to the event
   const team = await TeamsRepository.findById(teamId);
   if (!team) throw new NotFoundError("Equipo no encontrado");
 
@@ -281,14 +313,14 @@ export const createProject = async (teamId, data, userId, userRole) => {
 
   try {
     await n8nService.triggerProjectCreated(
-      {
-        id: project.id_project,
-        name: data.name.trim(),
-      },
-      {
-        githubUsername: leaderWithGithub.github_username,
-        githubToken: leaderWithGithub.github_token,
-      },
+        {
+          id: project.id_project,
+          name: data.name.trim(),
+        },
+        {
+          githubUsername: leaderWithGithub.github_username,
+          githubToken: leaderWithGithub.github_token,
+        },
     );
 
     await ProjectsRepository.update(project.id_project, {
@@ -311,6 +343,7 @@ export const confirmTeamProject = async (teamId, data, userId, userRole) => {
 
 export default {
   listProjects,
+  searchProjectsSemantic,
   getProjectById,
   getProjectByTeamId,
   updateProject,
@@ -318,4 +351,46 @@ export default {
   submitProject,
   createProject,
   confirmTeamProject,
+};
+
+// Generates embeddings for all projects that don't have one yet.
+// Returns a summary of how many were processed and how many failed.
+export const backfillEmbeddings = async (requestingRole) => {
+  if (requestingRole !== "ADMIN") {
+    throw new ForbiddenError("Only admins can trigger embedding backfill");
+  }
+
+  const { rows } = await pool.query(
+      `SELECT id_project, name, description
+     FROM projects
+     WHERE embedding IS NULL AND description IS NOT NULL AND description != ''`,
+  );
+
+  if (rows.length === 0) {
+    return { processed: 0, failed: 0, message: "All projects already have embeddings" };
+  }
+
+  let processed = 0;
+  let failed = 0;
+
+  for (const project of rows) {
+    try {
+      const text = `${project.name}. ${project.description}`;
+      const vector = await generarEmbedding(text);
+      await ProjectsRepository.updateEmbedding(project.id_project, vector);
+      processed++;
+      // Small pause to avoid hitting OpenAI rate limits
+      await new Promise((r) => setTimeout(r, 200));
+    } catch (err) {
+      console.error(`[backfillEmbeddings] Failed for project ${project.id_project}:`, err.message);
+      failed++;
+    }
+  }
+
+  return {
+    processed,
+    failed,
+    total: rows.length,
+    message: `Embeddings generated: ${processed}/${rows.length}`,
+  };
 };
