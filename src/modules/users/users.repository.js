@@ -397,7 +397,8 @@ export const findProjectsByUserId = async (userId, onlySubmitted = false) => {
       p.created_at,
       p.project_final_grade,
       t.name as team_name,
-      e.event_name
+      e.event_name,
+      e.event_status
     FROM projects p
     JOIN teams t ON p.team_id = t.id_team
     JOIN team_coders tc ON t.id_team = tc.id_team
