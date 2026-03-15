@@ -1,12 +1,10 @@
 import { Router } from "express";
-import { getUploadSignature, confirmUpload } from "./upload.controller.js";
+import UploadController from "./upload.controller.js";
 import { authenticate } from "../../middleware/auth.js";
 
 const router = Router();
 
-router.use(authenticate);
-
-router.post("/signature", getUploadSignature);
-router.post("/confirm",   confirmUpload);
+router.post("/signature", authenticate, UploadController.getUploadSignature);
+router.post("/confirm", authenticate, UploadController.confirmUpload);
 
 export default router;
