@@ -15,6 +15,7 @@ import config from "./config/env.js";
 import githubWebhookRouter from "./integrations/github.webhook.js";
 import emailRoutes from "./utils/emails/emails.routes.js";
 import votesRoutes from "./modules/QR-Votes/votes.routes.js";
+import uploadRoutes from "./modules/upload/upload.routes.js";
 import { join } from "path";
 
 const app = express();
@@ -64,6 +65,7 @@ app.use("/api/events/:eventId/ranking", rankingRoutes);
 app.use("/api/events/:eventId/finalists", finalistsRoutes);
 app.use("/api/comments", commentsRoutes);
 app.use("/api/evaluations", evaluationsRoutes);
+app.use("/api/upload", uploadRoutes);
 
 // Endpoint to send emails u
 app.use("/api/emails", emailRoutes);
