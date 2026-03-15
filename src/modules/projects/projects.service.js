@@ -27,7 +27,7 @@ export const listProjects = async (query) => {
 };
 
 // Semantic search against project descriptions using vector similarity.
-// Only returns projects with similarity >= SEMANTIC_SIMILARITY_THRESHOLD (0.3).
+// Only returns projects with similarity >= SEMANTIC_SIMILARITY_THRESHOLD (0.15).
 // Optionally filtered by eventId.
 export const searchProjectsSemantic = async (query, limit = 20, eventId = null) => {
   if (!query || query.trim().length === 0) {
@@ -308,6 +308,16 @@ export const createProject = async (teamId, data, userId, userRole) => {
     idEvent: team.id_event ?? null,
   });
 
+  // Generate embedding for the new project description (fire-and-forget).
+  if (project.description) {
+    const textToEmbed = `${project.name}. ${project.description}`;
+    generarEmbedding(textToEmbed)
+        .then((vector) => ProjectsRepository.updateEmbedding(project.id_project, vector))
+        .catch((err) =>
+            console.error(`[createProject] Failed to generate embedding for project ${project.id_project}:`, err.message),
+        );
+  }
+
   const repoName = `project-${data.name.toLowerCase().replace(/\s+/g, "-")}`;
   const repoUrl = `https://github.com/riwi-proyects-integrations/${repoName}`;
 
@@ -362,8 +372,8 @@ export const backfillEmbeddings = async (requestingRole) => {
 
   const { rows } = await pool.query(
       `SELECT id_project, name, description
-     FROM projects
-     WHERE embedding IS NULL AND description IS NOT NULL AND description != ''`,
+       FROM projects
+       WHERE embedding IS NULL AND description IS NOT NULL AND description != ''`,
   );
 
   if (rows.length === 0) {
