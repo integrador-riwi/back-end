@@ -16,13 +16,12 @@ export const getUploadSignature = async (req, res, next) => {
         }
 
         const timestamp = Math.round(Date.now() / 1000);
+        const config = cloudinary.config();
 
         const signature = cloudinary.utils.api_sign_request(
             { folder, timestamp },
-            process.env.CLOUDINARY_API_SECRET,
+            config.api_secret,
         );
-
-        const config = cloudinary.config();
 
         return res.json({
             success: true,
