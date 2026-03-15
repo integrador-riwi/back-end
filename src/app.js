@@ -17,8 +17,32 @@ import emailRoutes from "./utils/emails/emails.routes.js";
 import votesRoutes from "./modules/QR-Votes/votes.routes.js";
 import uploadRoutes from "./modules/upload/upload.routes.js";
 import { join } from "path";
+import swaggerUi from "swagger-ui-express";
+import swaggerSpec from "./config/swagger.js";
 
 const app = express();
+
+/**
+ * @swagger
+ * /api/health:
+ *   get:
+ *     summary: Verificar el estado del servidor
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: El servidor está funcionando
+ */
+
+/**
+ * @swagger
+ * /api-docs:
+ *   get:
+ *     summary: Documentación Swagger UI
+ *     tags: [Docs]
+ *     responses:
+ *       200:
+ *         description: Página de documentación interactiva
+ */
 
 const allowedOrigins = [
   "https://front-end-olive-six.vercel.app",
@@ -49,6 +73,9 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// Documentación Swagger
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use("/api/webhooks", githubWebhookRouter);
 

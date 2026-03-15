@@ -3,6 +3,32 @@ import crypto from "crypto";
 import pool from "../db/pool.js";
 import config from "../config/env.js";
 
+/**
+ * @swagger
+ * tags:
+ *   name: GitHubWebhooks
+ *   description: Webhook para integración con GitHub
+ */
+
+/**
+ * @swagger
+ * /api/webhooks/github:
+ *   post:
+ *     summary: Webhook para eventos de GitHub
+ *     tags: [GitHubWebhooks]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Webhook recibido correctamente
+ *       401:
+ *         description: Firma inválida o no autorizada
+ */
+
 const router = express.Router();
 
 function verifySignature(req, res, next) {
