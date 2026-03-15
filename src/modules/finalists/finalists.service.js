@@ -23,10 +23,6 @@ export const calculateAndSaveFinalists = async (eventId, requestingRole) => {
   const event = await FinalistsRepository.getEventById(eventId);
   if (!event) throw new NotFoundError('Event not found');
 
-  if (event.event_status === 'FINISHED' || event.status === 'FINISHED') {
-    throw new ConflictError('This event is already finished and has finalists registered');
-  }
-
   const existingCount = await FinalistsRepository.getFinalistsCountByEvent(eventId);
   if (existingCount > 0) {
     throw new ConflictError('Finalists are already registered for this event');
@@ -46,7 +42,7 @@ export const calculateAndSaveFinalists = async (eventId, requestingRole) => {
     );
   }
 
-  const projects = await FinalistsRepository.getTopProjectsByScore(eventId, 100);
+  const projects = await FinalistsRepository.getTopProjectsByScore(eventId, 9999);
   if (projects.length < TOP_N) {
     throw new ValidationError(
         `At least ${TOP_N} projects with a calculated score are required. Currently there are ${projects.length}.`,
@@ -83,7 +79,7 @@ export const calculateAndSaveFinalists = async (eventId, requestingRole) => {
   scored.sort((a, b) => b.final_grade - a.final_grade);
   const top3 = scored.slice(0, TOP_N);
 
-  const saved = await FinalistsRepository.saveFinalistsAndCloseEvent(eventId, top3);
+  const saved = await FinalistsRepository.saveFinalists(eventId, top3);
 
   const result = saved.map((row, i) => ({
     ...row,
@@ -121,10 +117,10 @@ export const selectTopProjectsAsFinalists = async (eventId, count = 3, requestin
 
   const rankingCheck = await pool.query(
       `SELECT 1
-     FROM individual_project_results ipr
-     JOIN projects p ON p.id_project = ipr.project_id
-     WHERE p.id_event = $1
-     LIMIT 1`,
+       FROM individual_project_results ipr
+              JOIN projects p ON p.id_project = ipr.project_id
+       WHERE p.id_event = $1
+       LIMIT 1`,
       [eventId],
   );
   if (!rankingCheck.rows.length) {
