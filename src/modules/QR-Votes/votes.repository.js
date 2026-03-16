@@ -100,6 +100,18 @@ const getVoteResultsByEvent = async (id_event) => {
     return result.rows;
 };
 
+const deleteVotesByEvent = async (id_event) => {
+    const result = await pool.query(
+        `DELETE FROM public_votes
+         WHERE qr_vote_id IN (
+             SELECT id FROM qr_votes WHERE id_event = $1
+         )
+         RETURNING id_vote`,
+        [id_event]
+    );
+    return result.rowCount; // número de votos eliminados
+};
+
 export {
     createQrVote,
     getActiveQrByEvent,
@@ -110,4 +122,5 @@ export {
     registerVote,
     getProjectsByEvent,
     getVoteResultsByEvent,
+    deleteVotesByEvent
 };

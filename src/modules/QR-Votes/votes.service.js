@@ -61,6 +61,11 @@ const getResults = async (id_event) => {
     return repo.getVoteResultsByEvent(id_event);
 };
 
+const deleteVotesByEvent = async (id_event) => {
+    const deleted = await repo.deleteVotesByEvent(id_event);
+    return { deleted_count: deleted };
+};
+
 export {
     createQrVote,
     getQrsByEvent,
@@ -68,4 +73,5 @@ export {
     getProjectsForVoting,
     registerVote,
     getResults,
+    deleteVotesByEvent,
 };

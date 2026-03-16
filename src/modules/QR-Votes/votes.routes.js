@@ -29,4 +29,7 @@ router.get('/vote/:eventId/projects', controller.getProjectsForVoting);
 // Body: { qr_vote_id, project_id }
 router.post('/vote', controller.registerVote);
 
+// Eliminar todos los votos públicos de un evento
+router.delete('/event/:eventId/votes', authenticate, controller.deleteVotesByEvent);
+
 export default router;

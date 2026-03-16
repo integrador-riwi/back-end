@@ -96,6 +96,23 @@ const getResults = async (req, res) => {
     }
 };
 
+// DELETE /api/qr-votes/event/:eventId/votes
+// Admin: elimina todos los votos públicos de un evento
+const deleteVotesByEvent = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+        const result = await service.deleteVotesByEvent(eventId);
+        res.json({
+            success: true,
+            message: `Se eliminaron ${result.deleted_count} voto(s) del evento`,
+            ...result,
+        });
+    } catch (err) {
+        const status = err.status || 500;
+        res.status(status).json({ error: err.message || 'Error al eliminar votos' });
+    }
+};
+
 export {
     createQrVote,
     getQrsByEvent,
@@ -103,4 +120,5 @@ export {
     getProjectsForVoting,
     registerVote,
     getResults,
+    deleteVotesByEvent,
 };
