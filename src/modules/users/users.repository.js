@@ -47,7 +47,7 @@ export const findAll = async ({ role, clan, isActive, search, page = 1, limit = 
       u.document_type,
       u.clan,
       u.is_active,
-      p.github_url,
+      u.github_username,
       p.description as profile_description
     FROM users u
     LEFT JOIN profiles p ON u.id_user = p.user_id
@@ -82,7 +82,7 @@ export const findById = async (id) => {
       u.clan,
       u.is_active,
       u.github_avatar_url,
-      p.github_url,
+      u.github_username,
       p.description as profile_description
     FROM users u
     LEFT JOIN profiles p ON u.id_user = p.user_id
@@ -309,7 +309,7 @@ export const findAvailableCoders = async ({ search = null, page = 1, limit = 20 
       u.name,
       u.email,
       u.clan,
-      p.github_url,
+      u.github_username,
       p.description as profile_description
     FROM users u
     LEFT JOIN profiles p ON u.id_user = p.user_id

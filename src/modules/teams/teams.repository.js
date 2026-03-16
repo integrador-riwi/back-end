@@ -188,7 +188,7 @@ export const findByIdWithMembers = async (id) => {
       u.clan,
       u.github_avatar_url,
       tc.team_role,
-      p.github_url
+      u.github_username
     FROM team_coders tc
            JOIN users u ON tc.id_user = u.id_user
            LEFT JOIN profiles p ON u.id_user = p.user_id
@@ -461,7 +461,7 @@ export const getAvailableCoders = async (
       u.name,
       u.email,
       u.clan,
-      p.github_url,
+      u.github_username,
       p.description as profile_description
     FROM users u
            LEFT JOIN profiles p ON u.id_user = p.user_id
