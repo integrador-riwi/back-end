@@ -9,8 +9,8 @@ import {
 
 export const getRankingStatus = async (eventId) => {
   const eventRes = await pool.query(
-    `SELECT id_event, event_status, final_delivery_date FROM events WHERE id_event = $1`,
-    [eventId],
+      `SELECT id_event, event_status, final_delivery_date FROM events WHERE id_event = $1`,
+      [eventId],
   );
   if (!eventRes.rows[0]) throw new NotFoundError("Evento no encontrado");
 
@@ -18,8 +18,8 @@ export const getRankingStatus = async (eventId) => {
   const rows = await RankingRepository.getEventEvaluationStatus(eventId);
 
   const isDeadlinePassed = event.final_delivery_date
-    ? new Date(event.final_delivery_date) < new Date()
-    : false;
+      ? new Date(event.final_delivery_date) < new Date()
+      : false;
 
   if (!rows.length) {
     return {
@@ -49,10 +49,10 @@ export const getRankingStatus = async (eventId) => {
   }));
 
   const fullyEvaluatedProjects = projects.filter(
-    (p) => p.fullyEvaluated,
+      (p) => p.fullyEvaluated,
   ).length;
   const allProjectsEvaluated =
-    projects.length > 0 && fullyEvaluatedProjects === projects.length;
+      projects.length > 0 && fullyEvaluatedProjects === projects.length;
 
   return {
     eventId: parseInt(eventId),
@@ -87,13 +87,13 @@ export const publishRanking = async (eventId, requestingRole) => {
 
   // Warn if deadline hasn't passed, but don't block
   const deadlineWarning =
-    !status.isDeadlinePassed && status.deliveryDate
-      ? [
-          {
-            message: `El evento aún no ha cerrado (fecha de entrega: ${new Date(status.deliveryDate).toLocaleDateString("es-CO")}). Ranking publicado de forma anticipada.`,
-          },
-        ]
-      : [];
+      !status.isDeadlinePassed && status.deliveryDate
+          ? [
+            {
+              message: `El evento aún no ha cerrado (fecha de entrega: ${new Date(status.deliveryDate).toLocaleDateString("es-CO")}). Ranking publicado de forma anticipada.`,
+            },
+          ]
+          : [];
 
   const projectIds = await RankingRepository.getProjectsForEvent(eventId);
 
@@ -124,25 +124,23 @@ export const publishRanking = async (eventId, requestingRole) => {
 
 export const getPublishedRanking = async (eventId) => {
   const eventRes = await pool.query(
-    `SELECT id_event, title, event_status, final_delivery_date FROM events WHERE id_event = $1`,
-    [eventId],
+      `SELECT id_event, title, event_status, final_delivery_date FROM events WHERE id_event = $1`,
+      [eventId],
   );
   if (!eventRes.rows[0]) throw new NotFoundError("Evento no encontrado");
 
   const ranking = await RankingRepository.getEventRanking(eventId);
 
   if (!ranking.length) {
-    throw new NotFoundError(
-      "No hay ranking publicado para este evento. El admin debe calcularlo primero.",
-    );
+    return { ranking: [], calculatedAt: null, event: eventRes.rows[0] };
   }
 
   const calcRes = await pool.query(
-    `SELECT MAX(calculated_at) AS calculated_at
-     FROM individual_project_results ipr
-     JOIN projects p ON p.id_project = ipr.project_id
-     WHERE p.id_event = $1`,
-    [eventId],
+      `SELECT MAX(calculated_at) AS calculated_at
+       FROM individual_project_results ipr
+              JOIN projects p ON p.id_project = ipr.project_id
+       WHERE p.id_event = $1`,
+      [eventId],
   );
 
   return {

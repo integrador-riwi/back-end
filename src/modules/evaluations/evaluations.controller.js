@@ -33,8 +33,8 @@ const EvaluationsController = {
     const evaluatorUserId = req.user.id_user;
 
     const evaluations = await EvaluationsService.getMyEvaluationsForProject(
-      projectId,
-      evaluatorUserId,
+        projectId,
+        evaluatorUserId,
     );
 
     return success(res, evaluations);
@@ -48,8 +48,8 @@ const EvaluationsController = {
     const requestingRole = req.user.role;
 
     const results = await EvaluationsService.calculateProjectGrades(
-      projectId,
-      requestingRole,
+        projectId,
+        requestingRole,
     );
 
     return success(res, {
@@ -73,6 +73,48 @@ const EvaluationsController = {
     const eventId = parseInt(req.params.eventId);
     const results = await EvaluationsService.getEventResults(eventId);
     return success(res, results);
+  }),
+
+  // GET /api/evaluations/event/:eventId/coverage
+  // Returns per-project area coverage so the admin can see readiness to close.
+  getEventEvalCoverage: asyncHandler(async (req, res) => {
+    const eventId = parseInt(req.params.eventId);
+    const coverage = await EvaluationsService.getEventEvalCoverage(eventId);
+    return success(res, coverage);
+  }),
+
+  // POST /api/evaluations/event/:eventId/close  (ADMIN only)
+  closeEvaluations: asyncHandler(async (req, res) => {
+    const eventId = parseInt(req.params.eventId);
+    const result = await EvaluationsService.closeEventEvaluations(eventId);
+    return success(res, { message: "Evaluations closed successfully.", ...result });
+  }),
+
+  // POST /api/evaluations/event/:eventId/reopen  (ADMIN only)
+  reopenEvaluations: asyncHandler(async (req, res) => {
+    const eventId = parseInt(req.params.eventId);
+    const result = await EvaluationsService.reopenEventEvaluations(eventId);
+    return success(res, { message: "Evaluations reopened successfully.", ...result });
+  }),
+
+  // GET /api/evaluations/project/:projectId/eval-status
+  // Returns blocking status for the current TL (closed flag, area cap, already submitted).
+  getProjectEvalStatus: asyncHandler(async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    const evaluatorUserId = req.user.id_user;
+    const evaluatorRole = req.user.role;
+    const status = await EvaluationsService.getProjectEvalStatus(
+        projectId,
+        evaluatorUserId,
+        evaluatorRole,
+    );
+    return success(res, status);
+  }),
+  // GET /api/evaluations/event/:eventId/team-eval-counts
+  getTeamEvalCounts: asyncHandler(async (req, res) => {
+    const eventId = parseInt(req.params.eventId);
+    const counts = await EvaluationsService.getTeamEvalCounts(eventId);
+    return success(res, counts);
   }),
 };
 

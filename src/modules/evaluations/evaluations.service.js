@@ -15,6 +15,8 @@ const ROLE_AREA_MAP = {
   TL_ENGLISH: "ENGLISH",
 };
 
+const MAX_EVALUATORS_PER_AREA = 3;
+
 // ── Get rubrics + grade options for an event ──────────────────────────────────
 
 export const getRubricsForEvent = async (eventId) => {
@@ -23,7 +25,7 @@ export const getRubricsForEvent = async (eventId) => {
 
   const rubricIds = rubrics.map((r) => r.id_rubric);
   const allGrades = await Promise.all(
-    rubricIds.map((id) => EvaluationsRepository.getGradesByRubric(id)),
+      rubricIds.map((id) => EvaluationsRepository.getGradesByRubric(id)),
   );
 
   return rubrics.map((rubric, i) => ({
@@ -35,11 +37,11 @@ export const getRubricsForEvent = async (eventId) => {
 // ── Submit evaluations for all members of a project ──────────────────────────
 
 export const submitEvaluations = async ({
-  projectId,
-  evaluatorUserId,
-  evaluatorRole,
-  evaluations, // [{ evaluatedUserId, gradeId, feedback }]
-}) => {
+                                          projectId,
+                                          evaluatorUserId,
+                                          evaluatorRole,
+                                          evaluations, // [{ evaluatedUserId, gradeId, feedback }]
+                                        }) => {
   if (!TL_ROLES.includes(evaluatorRole)) {
     throw new ForbiddenError("Only Team Leads can submit evaluations.");
   }
@@ -49,11 +51,11 @@ export const submitEvaluations = async ({
 
   // Resolve eventId from project — if missing, fall back to the team's event
   const projectRes = await pool.query(
-    `SELECT p.id_event, p.team_id, t.id_event AS team_event_id
-     FROM projects p
-     JOIN teams t ON t.id_team = p.team_id
-     WHERE p.id_project = $1`,
-    [projectId],
+      `SELECT p.id_event, p.team_id, t.id_event AS team_event_id
+       FROM projects p
+              JOIN teams t ON t.id_team = p.team_id
+       WHERE p.id_project = $1`,
+      [projectId],
   );
   const project = projectRes.rows[0];
   if (!project) throw new NotFoundError("Project not found.");
@@ -62,8 +64,8 @@ export const submitEvaluations = async ({
   let eventId = project.id_event;
   if (!eventId && project.team_event_id) {
     await pool.query(
-      "UPDATE projects SET id_event = $1 WHERE id_project = $2",
-      [project.team_event_id, projectId],
+        "UPDATE projects SET id_event = $1 WHERE id_project = $2",
+        [project.team_event_id, projectId],
     );
     eventId = project.team_event_id;
   }
@@ -71,21 +73,46 @@ export const submitEvaluations = async ({
   if (!eventId)
     throw new ValidationError("This project is not linked to an event.");
 
+  // ── Rule: evaluations_closed blocks all new submissions ──────────────────
+  const evalStatus = await EvaluationsRepository.getEventEvalStatus(eventId);
+  if (evalStatus?.evaluations_closed) {
+    throw new ForbiddenError(
+        "Evaluations for this event have been closed by the administrator.",
+    );
+  }
+
   if (!Array.isArray(evaluations) || evaluations.length === 0) {
     throw new ValidationError("You must provide at least one evaluation.");
   }
 
-  // Block re-submission: if this TL already has ANY evaluation for this project, reject
-  const existingCheck = await pool.query(
-    `SELECT id_evaluation FROM evaluations
-     WHERE project_id = $1 AND evaluator_user_id = $2
-     LIMIT 1`,
-    [projectId, evaluatorUserId],
-  );
-  if (existingCheck.rows.length > 0) {
-    throw new ForbiddenError(
-      "You have already submitted evaluations for this project.",
+  // ── Rule: TL cannot re-submit for an area they already graded ────────────
+  // Determine which area(s) this submission targets (derived from gradeIds)
+  // We resolve the area per grade inside the loop below, but we need a pre-check.
+  // We'll do a lightweight check: if the TL already has ANY row for this project
+  // in their restricted area, block early.
+  if (allowedArea) {
+    const alreadySubmittedArea =
+        await EvaluationsRepository.hasEvaluatorSubmittedArea(
+            projectId,
+            evaluatorUserId,
+            allowedArea,
+        );
+    if (alreadySubmittedArea) {
+      throw new ForbiddenError(
+          `You have already submitted evaluations for the ${allowedArea} area of this project.`,
+      );
+    }
+
+    // ── Rule: max 3 evaluators per area ─────────────────────────────────────
+    const evaluatorCount = await EvaluationsRepository.countEvaluatorsForArea(
+        projectId,
+        allowedArea,
     );
+    if (evaluatorCount >= MAX_EVALUATORS_PER_AREA) {
+      throw new ForbiddenError(
+          `The ${allowedArea} area for this project has already reached the maximum of ${MAX_EVALUATORS_PER_AREA} evaluators.`,
+      );
+    }
   }
 
   // Wrap all inserts in a transaction — if any row fails the whole submit rolls back,
@@ -101,17 +128,17 @@ export const submitEvaluations = async ({
 
       if (!evaluatedUserId || !gradeId) {
         throw new ValidationError(
-          "Each evaluation requires evaluatedUserId and gradeId.",
+            "Each evaluation requires evaluatedUserId and gradeId.",
         );
       }
 
       // Get area from rubric linked to this grade
       const gradeRes = await client.query(
-        `SELECT g.id_grade, g.id_rubric, r.area
-         FROM grades g
-         JOIN rubrics r ON g.id_rubric = r.id_rubric
-         WHERE g.id_grade = $1`,
-        [gradeId],
+          `SELECT g.id_grade, g.id_rubric, r.area
+           FROM grades g
+                  JOIN rubrics r ON g.id_rubric = r.id_rubric
+           WHERE g.id_grade = $1`,
+          [gradeId],
       );
       const gradeRow = gradeRes.rows[0];
       if (!gradeRow) throw new NotFoundError(`Grade ${gradeId} not found.`);
@@ -121,29 +148,29 @@ export const submitEvaluations = async ({
       // Enforce area restriction: TLs can only evaluate their assigned area
       if (allowedArea && area !== allowedArea) {
         throw new ForbiddenError(
-          `As ${evaluatorRole} you can only evaluate the ${allowedArea} area, not ${area}.`,
+            `As ${evaluatorRole} you can only evaluate the ${allowedArea} area, not ${area}.`,
         );
       }
 
       const saved = await client.query(
-        `INSERT INTO evaluations
+          `INSERT INTO evaluations
            (project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade)
-         VALUES ($1, $2, $3, $4, $5::evaluation_area, $6, $7)
-         ON CONFLICT (project_id, evaluator_user_id, evaluated_user_id, area)
-         DO UPDATE SET
-           feedback = EXCLUDED.feedback,
-           id_grade = EXCLUDED.id_grade,
-           event_id = EXCLUDED.event_id
-         RETURNING id_evaluation, project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade, created_at`,
-        [
-          projectId,
-          eventId,
-          evaluatorUserId,
-          evaluatedUserId,
-          area,
-          feedback ?? null,
-          gradeId,
-        ],
+           VALUES ($1, $2, $3, $4, $5::evaluation_area, $6, $7)
+           ON CONFLICT (project_id, evaluator_user_id, evaluated_user_id, area)
+             DO UPDATE SET
+                         feedback = EXCLUDED.feedback,
+                         id_grade = EXCLUDED.id_grade,
+                         event_id = EXCLUDED.event_id
+           RETURNING id_evaluation, project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade, created_at`,
+          [
+            projectId,
+            eventId,
+            evaluatorUserId,
+            evaluatedUserId,
+            area,
+            feedback ?? null,
+            gradeId,
+          ],
       );
 
       results.push(saved.rows[0]);
@@ -160,19 +187,19 @@ export const submitEvaluations = async ({
   // ── Auto-calculate if all required areas now have at least one evaluator ──
   // Required areas = distinct areas with active rubrics for this event
   const requiredAreasRes = await pool.query(
-    `SELECT DISTINCT area FROM rubrics WHERE id_event = $1 AND active = true`,
-    [eventId],
+      `SELECT DISTINCT area FROM rubrics WHERE id_event = $1 AND active = true`,
+      [eventId],
   );
   const requiredAreas = requiredAreasRes.rows.map((r) => r.area);
 
   if (requiredAreas.length > 0) {
     // Covered areas = distinct areas that have at least 1 evaluation for this project
     const coveredAreasRes = await pool.query(
-      `SELECT DISTINCT e.area
-       FROM evaluations e
-       JOIN rubrics r ON r.area = e.area AND r.id_event = $2 AND r.active = true
-       WHERE e.project_id = $1`,
-      [projectId, eventId],
+        `SELECT DISTINCT e.area
+         FROM evaluations e
+                JOIN rubrics r ON r.area = e.area AND r.id_event = $2 AND r.active = true
+         WHERE e.project_id = $1`,
+        [projectId, eventId],
     );
     const coveredAreas = coveredAreasRes.rows.map((r) => r.area);
 
@@ -192,12 +219,12 @@ export const submitEvaluations = async ({
 // ── Get evaluations already submitted by this TL for this project ─────────────
 
 export const getMyEvaluationsForProject = async (
-  projectId,
-  evaluatorUserId,
-) => {
-  return EvaluationsRepository.getEvaluationsByProject(
     projectId,
     evaluatorUserId,
+) => {
+  return EvaluationsRepository.getEvaluationsByProject(
+      projectId,
+      evaluatorUserId,
   );
 };
 
@@ -208,29 +235,29 @@ export const calculateProjectGrades = async (projectId, requestingRole) => {
 
   // Verify project exists and auto-heal missing id_event
   const projectRes = await pool.query(
-    `SELECT p.id_project, p.id_event, t.id_event AS team_event_id
-     FROM projects p
-     JOIN teams t ON t.id_team = p.team_id
-     WHERE p.id_project = $1`,
-    [projectId],
+      `SELECT p.id_project, p.id_event, t.id_event AS team_event_id
+       FROM projects p
+              JOIN teams t ON t.id_team = p.team_id
+       WHERE p.id_project = $1`,
+      [projectId],
   );
   if (!projectRes.rows[0]) throw new NotFoundError("Project not found.");
 
   const projectRow = projectRes.rows[0];
   if (!projectRow.id_event && projectRow.team_event_id) {
     await pool.query(
-      "UPDATE projects SET id_event = $1 WHERE id_project = $2",
-      [projectRow.team_event_id, projectId],
+        "UPDATE projects SET id_event = $1 WHERE id_project = $2",
+        [projectRow.team_event_id, projectId],
     );
   }
 
   // Pull every raw evaluation row for this project
   const rawRows =
-    await EvaluationsRepository.getRawEvaluationsForProject(projectId);
+      await EvaluationsRepository.getRawEvaluationsForProject(projectId);
 
   if (!rawRows.length) {
     throw new ValidationError(
-      "No evaluations found for this project. Nothing to calculate.",
+        "No evaluations found for this project. Nothing to calculate.",
     );
   }
 
@@ -313,9 +340,9 @@ export const calculateProjectGrades = async (projectId, requestingRole) => {
     }
 
     const studentFinal =
-      totalAreaWeight > 0
-        ? parseFloat((weightedAreaSum / totalAreaWeight).toFixed(2))
-        : 0;
+        totalAreaWeight > 0
+            ? parseFloat((weightedAreaSum / totalAreaWeight).toFixed(2))
+            : 0;
 
     // Persist project result
     const saved = await EvaluationsRepository.upsertProjectResult({
@@ -336,13 +363,139 @@ export const calculateProjectGrades = async (projectId, requestingRole) => {
   return savedResults;
 };
 
+// ── Close / reopen evaluations for an event (ADMIN only) ─────────────────────
+
+export const closeEventEvaluations = async (eventId) => {
+  const event = await EvaluationsRepository.getEventEvalStatus(eventId);
+  if (!event) throw new NotFoundError("Event not found.");
+  if (event.evaluations_closed) {
+    throw new ValidationError("Evaluations are already closed for this event.");
+  }
+
+  // Close unconditionally — admin decision
+  const result = await EvaluationsRepository.setEvaluationsClosed(eventId, true);
+
+  // Fire-and-forget: calculate grades for every project that has at least
+  // one evaluation (even if not all areas are covered)
+  pool.query(
+      `SELECT DISTINCT p.id_project
+       FROM projects p
+              JOIN evaluations e ON e.project_id = p.id_project
+       WHERE p.id_event = $1 AND p.submitted_at IS NOT NULL`,
+      [eventId],
+  ).then(async (res) => {
+    for (const row of res.rows) {
+      try {
+        await calculateProjectGrades(row.id_project, "ADMIN");
+      } catch (err) {
+        console.error(`[close-event] calculate project ${row.id_project}:`, err.message);
+      }
+    }
+  }).catch((err) => {
+    console.error(`[close-event] grade calculation batch failed:`, err.message);
+  });
+
+  return result;
+};
+
+export const reopenEventEvaluations = async (eventId) => {
+  const event = await EvaluationsRepository.getEventEvalStatus(eventId);
+  if (!event) throw new NotFoundError("Event not found.");
+  if (!event.evaluations_closed) {
+    throw new ValidationError("Evaluations are not closed for this event.");
+  }
+  return EvaluationsRepository.setEvaluationsClosed(eventId, false);
+};
+
+// ── Project evaluation status (for TL frontend blocking) ─────────────────────
+
+/**
+ * Returns, for a given project + evaluator:
+ *   - evaluations_closed   : whether the event has closed evaluations
+ *   - area_closed          : whether the TL's area is already at max evaluators
+ *   - already_submitted    : whether this TL already submitted for their area
+ *   - evaluator_count      : how many evaluators have graded their area
+ */
+export const getProjectEvalStatus = async (projectId, evaluatorUserId, evaluatorRole) => {
+  const allowedArea = ROLE_AREA_MAP[evaluatorRole] ?? null;
+
+  // Resolve eventId
+  const projectRes = await pool.query(
+      `SELECT COALESCE(p.id_event, t.id_event) AS event_id
+       FROM projects p
+              JOIN teams t ON t.id_team = p.team_id
+       WHERE p.id_project = $1`,
+      [projectId],
+  );
+  const eventId = projectRes.rows[0]?.event_id ?? null;
+
+  const evalStatus = eventId
+      ? await EvaluationsRepository.getEventEvalStatus(eventId)
+      : null;
+
+  const evaluations_closed = evalStatus?.evaluations_closed ?? false;
+
+  if (!allowedArea) {
+    // ADMIN: only report evaluations_closed
+    return { evaluations_closed, area_closed: false, already_submitted: false, evaluator_count: null };
+  }
+
+  const [evaluatorCount, alreadySubmitted] = await Promise.all([
+    EvaluationsRepository.countEvaluatorsForArea(projectId, allowedArea),
+    EvaluationsRepository.hasEvaluatorSubmittedArea(projectId, evaluatorUserId, allowedArea),
+  ]);
+
+  return {
+    evaluations_closed,
+    area_closed: evaluatorCount >= MAX_EVALUATORS_PER_AREA,
+    already_submitted: alreadySubmitted,
+    evaluator_count: evaluatorCount,
+    max_evaluators: MAX_EVALUATORS_PER_AREA,
+    area: allowedArea,
+  };
+};
+
+export const getEventEvalCoverage = async (eventId) => {
+  const event = await EvaluationsRepository.getEventEvalStatus(eventId);
+  if (!event) throw new NotFoundError("Event not found.");
+  const coverage = await EvaluationsRepository.getEventEvalCoverage(eventId);
+  // Also return which areas are required for this event
+  const areasRes = await pool.query(
+      `SELECT DISTINCT area FROM rubrics WHERE id_event = $1 AND active = true ORDER BY area`,
+      [eventId],
+  );
+  return {
+    evaluations_closed: event.evaluations_closed,
+    requiredAreas: areasRes.rows.map(r => r.area),
+    ...coverage,
+  };
+};
+
+export const getTeamEvalCounts = async (eventId) => {
+  const event = await EvaluationsRepository.getEventEvalStatus(eventId);
+  if (!event) throw new NotFoundError("Event not found.");
+  const rows = await EvaluationsRepository.getTeamEvalCounts(eventId);
+
+  // Group rows into { teamId → { teamName, areas: { DEVELOPMENT: N, ... } } }
+  const map = {};
+  for (const row of rows) {
+    if (!map[row.id_team]) {
+      map[row.id_team] = { id_team: row.id_team, team_name: row.team_name, areas: {} };
+    }
+    if (row.area) {
+      map[row.id_team].areas[row.area] = parseInt(row.evaluator_count, 10);
+    }
+  }
+  return Object.values(map);
+};
+
 // ── Read persisted results for a project ─────────────────────────────────────
 
 export const getProjectResults = async (projectId) => {
   // Verify project exists
   const projectRes = await pool.query(
-    "SELECT id_project FROM projects WHERE id_project = $1",
-    [projectId],
+      "SELECT id_project FROM projects WHERE id_project = $1",
+      [projectId],
   );
   if (!projectRes.rows[0]) throw new NotFoundError("Project not found.");
 
@@ -350,7 +503,7 @@ export const getProjectResults = async (projectId) => {
 
   if (!rows.length) {
     throw new NotFoundError(
-      "No calculated results found for this project. Run /calculate first.",
+        "No calculated results found for this project. Run /calculate first.",
     );
   }
 
@@ -362,8 +515,8 @@ export const getProjectResults = async (projectId) => {
 export const getEventResults = async (eventId) => {
   // Verify event exists
   const eventRes = await pool.query(
-    "SELECT id_event FROM events WHERE id_event = $1",
-    [eventId],
+      "SELECT id_event FROM events WHERE id_event = $1",
+      [eventId],
   );
   if (!eventRes.rows[0]) throw new NotFoundError("Event not found.");
 
@@ -371,7 +524,7 @@ export const getEventResults = async (eventId) => {
 
   if (!rows.length) {
     throw new NotFoundError(
-      "No calculated results found for this event. Run /calculate on each project first.",
+        "No calculated results found for this event. Run /calculate on each project first.",
     );
   }
 
@@ -385,4 +538,9 @@ export default {
   calculateProjectGrades,
   getProjectResults,
   getEventResults,
+  closeEventEvaluations,
+  reopenEventEvaluations,
+  getProjectEvalStatus,
+  getEventEvalCoverage,
+  getTeamEvalCounts,
 };
