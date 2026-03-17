@@ -5,13 +5,13 @@ import { getIO } from '../../socket/index.js';
 // Admin: crea una sesión de votación y genera el QR
 const createQrVote = async (req, res) => {
     try {
-        const { id_event, expires_at, top_n } = req.body;
+        const { id_event, expires_at, top_n, finalist_ids } = req.body;
         const created_by = req.user.id_user;
 
         if (!id_event) return res.status(400).json({ error: 'id_event es requerido' });
         if (!top_n || top_n < 1) return res.status(400).json({ error: 'top_n debe ser un número mayor a 0' });
 
-        const result = await service.createQrVote({ id_event, expires_at, created_by, top_n });
+        const result = await service.createQrVote({ id_event, expires_at, created_by, top_n, finalist_ids });
         res.status(201).json(result);
     } catch (err) {
         const status = err.status || 500;
@@ -61,26 +61,25 @@ const getProjectsForVoting = async (req, res) => {
 // POST /api/vote
 // Público: registra el voto de una persona externa
 const registerVote = async (req, res) => {
-  try {
-    const { qr_vote_id, project_id } = req.body;
-    const voter_ip = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
+    try {
+        const { qr_vote_id, project_id, voter_token } = req.body;
 
-    if (!qr_vote_id || !project_id)
-      return res.status(400).json({ error: 'qr_vote_id y project_id son requeridos' });
+        if (!qr_vote_id || !project_id || !voter_token)
+            return res.status(400).json({ error: 'qr_vote_id, project_id y voter_token son requeridos' });
 
-    const vote = await service.registerVote({ qr_vote_id, project_id, voter_ip });
+        const vote = await service.registerVote({ qr_vote_id, project_id, voter_token });
 
-    const io = getIO();
-    if (io) {
-      io.emit("vote:new", { qr_vote_id, project_id, vote });
+        const io = getIO();
+        if (io) {
+            io.emit("vote:new", { qr_vote_id, project_id, vote });
+        }
+
+        res.status(201).json({ success: true, message: '¡Voto registrado exitosamente!', vote });
+
+    } catch (err) {
+        const status = err.status || 500;
+        res.status(status).json({ error: err.message || 'Error al registrar voto' });
     }
-
-    res.status(201).json({ success: true, message: '¡Voto registrado exitosamente!', vote });
-
-  } catch (err) {
-    const status = err.status || 500;
-    res.status(status).json({ error: err.message || 'Error al registrar voto' });
-  }
 };
 
 // GET /api/qr-votes/event/:eventId/results

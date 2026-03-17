@@ -1,11 +1,11 @@
 import pool from '../../db/pool.js';
 
-const createQrVote = async ({ qr_code_url, expires_at, id_event, created_by, top_n }) => {
+const createQrVote = async ({ qr_code_url, expires_at, id_event, created_by, top_n, finalist_ids }) => {
     const result = await pool.query(
-        `INSERT INTO qr_votes (qr_code_url, expires_at, active, id_event, created_by, top_n)
-         VALUES ($1, $2, true, $3, $4, $5)
+        `INSERT INTO qr_votes (qr_code_url, expires_at, active, id_event, created_by, top_n, finalist_ids)
+         VALUES ($1, $2, true, $3, $4, $5, $6)
          RETURNING *`,
-        [qr_code_url, expires_at || null, id_event, created_by, top_n]
+        [qr_code_url, expires_at || null, id_event, created_by, top_n, JSON.stringify(finalist_ids || [])]
     );
     return result.rows[0];
 };
@@ -51,26 +51,39 @@ const getQrsByEvent = async (id_event) => {
     return result.rows;
 };
 
-const findExistingVote = async ({ qr_vote_id, voter_ip }) => {
+const findExistingVote = async ({ qr_vote_id, voter_token }) => {
     const result = await pool.query(
         `SELECT id_vote FROM public_votes
-         WHERE qr_vote_id = $1 AND voter_ip = $2`,
-        [qr_vote_id, voter_ip]
+         WHERE qr_vote_id = $1 AND voter_token = $2`,
+        [qr_vote_id, voter_token]
     );
     return result.rows[0] || null;
 };
 
-const registerVote = async ({ qr_vote_id, project_id, voter_ip }) => {
+const registerVote = async ({ qr_vote_id, project_id, voter_token }) => {
     const result = await pool.query(
-        `INSERT INTO public_votes (qr_vote_id, project_id, voter_ip)
+        `INSERT INTO public_votes (qr_vote_id, project_id, voter_token)
          VALUES ($1, $2, $3)
          RETURNING *`,
-        [qr_vote_id, project_id, voter_ip]
+        [qr_vote_id, project_id, voter_token]
     );
     return result.rows[0];
 };
 
-const getProjectsByEvent = async (id_event, top_n) => {
+const getProjectsByEvent = async (id_event, top_n, finalist_ids) => {
+    // Si tenemos IDs exactos aprobados por el admin, usarlos directamente
+    if (finalist_ids && finalist_ids.length > 0) {
+        const result = await pool.query(
+            `SELECT p.id_project, p.name, p.description, p.preview_photo_url,
+                    t.name AS team_name
+             FROM projects p
+                      JOIN teams t ON t.id_team = p.team_id
+             WHERE p.id_project = ANY($1::int[])`,
+            [finalist_ids]
+        );
+        return result.rows;
+    }
+    // Fallback: usar project_final_grade si no hay IDs guardados
     const result = await pool.query(
         `SELECT p.id_project, p.name, p.description, p.preview_photo_url,
                 t.name AS team_name
