@@ -60,13 +60,12 @@ export const calculateAndSaveFinalists = async (eventId, requestingRole) => {
   const publicVoteCounts = await FinalistsRepository.getVoteCountsByEvent(eventId);
   const publicVotesMap   = buildVotesMap(publicVoteCounts);
 
-  // Votos del staff (usuarios con role = 'STAFF' que votaron)
+  // Votos del staff — identificados por voter_role = 'STAFF' en public_votes
   const staffVoteResult = await pool.query(
     `SELECT pv.project_id, COUNT(pv.id_vote)::integer AS votes_count
      FROM public_votes pv
      JOIN qr_votes qr ON qr.id = pv.qr_vote_id
-     JOIN users u ON u.id_user::text = pv.voter_token
-     WHERE qr.id_event = $1 AND u.role = 'STAFF'
+     WHERE qr.id_event = $1 AND pv.voter_role = 'STAFF'
      GROUP BY pv.project_id`,
     [eventId],
   );
