@@ -6,8 +6,8 @@ export const list = async (req, res, next) => {
     const { role, clan, isActive, search, page, limit } = req.query;
 
     const result = await usersService.listUsers(
-      { role, clan, isActive, search },
-      { page, limit }
+        { role, clan, isActive, search },
+        { page, limit }
     );
 
     return success(res, { message: 'Usuarios obtenidos exitosamente', ...result });
@@ -88,9 +88,9 @@ export const toggleStatus = async (req, res, next) => {
 
     const user = await usersService.toggleUserStatus(id, isActive, requesterId);
 
-    const message = isActive 
-      ? 'Usuario activado exitosamente' 
-      : 'Usuario desactivado exitosamente';
+    const message = isActive
+        ? 'Usuario activado exitosamente'
+        : 'Usuario desactivado exitosamente';
 
     return success(res, { message, user });
   } catch (error) {
@@ -103,8 +103,8 @@ export const getAvailable = async (req, res, next) => {
     const { search, page, limit } = req.query;
 
     const result = await usersService.getAvailableCoders(
-      { search },
-      { page, limit }
+        { search },
+        { page, limit }
     );
 
     return success(res, { message: 'Coders disponibles obtenidos exitosamente', ...result });
@@ -139,8 +139,9 @@ export const getPublicProfile = async (req, res, next) => {
   try {
     const { id } = req.params;
     const viewerRole = req.user.role;
+    const requesterId = req.user.id_user;
 
-    const profile = await usersService.getPublicProfile(id, viewerRole);
+    const profile = await usersService.getPublicProfile(id, viewerRole, requesterId);
 
     return success(res, profile);
   } catch (error) {

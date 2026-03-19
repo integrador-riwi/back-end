@@ -184,19 +184,26 @@ export const getUserStats = async () => {
   return stats;
 };
 
-export const getPublicProfile = async (userId, viewerRole) => {
+export const getPublicProfile = async (userId, viewerRole, requesterId = null) => {
   const user = await UsersRepository.findById(userId);
 
   if (!user) {
     throw new NotFoundError("Usuario no encontrado");
   }
 
-  // If viewer is CODER, they only see submitted projects.
-  // ADMIN and TLs (DEVELOPMENT, SOFT_SKILLS, ENGLISH) see all projects.
-  const onlySubmitted = viewerRole === "CODER";
+  // Owner, ADMIN and TLs see all projects (including in-progress events).
+  // Other CODERs only see submitted projects.
+  const isOwner = String(requesterId) === String(userId);
+  const isPrivileged = isOwner
+      || viewerRole === "ADMIN"
+      || viewerRole === "TL_DEVELOPMENT"
+      || viewerRole === "TL_SOFT_SKILLS"
+      || viewerRole === "TL_ENGLISH";
+
+  const onlySubmitted = !isPrivileged;
   const projects = await UsersRepository.findProjectsByUserId(
-    userId,
-    onlySubmitted,
+      userId,
+      onlySubmitted,
   );
 
   return {
