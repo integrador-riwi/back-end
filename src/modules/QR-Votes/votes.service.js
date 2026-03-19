@@ -7,7 +7,6 @@ import 'dotenv/config';
 const createQrVote = async ({ id_event, expires_at, created_by, top_n, finalist_ids, vote_type = 'PUBLIC' }) => {
     const isStaff = vote_type === 'STAFF';
 
-    // Para staff: la URL lleva un token privado único, no expone el id del evento
     const staff_token = isStaff ? crypto.randomUUID() : null;
 
     const votePageUrl = isStaff
@@ -25,8 +24,8 @@ const createQrVote = async ({ id_event, expires_at, created_by, top_n, finalist_
         staff_token,
     });
 
-    // QR en base64 para mostrar en el frontend
-    const qrImage = await QRCode.toDataURL(votePageUrl);
+    // Solo generar imagen QR para sesiones públicas
+    const qrImage = isStaff ? null : await QRCode.toDataURL(votePageUrl);
 
     return { qrVote, qrImage, votePageUrl };
 };
