@@ -1,6 +1,17 @@
 import * as service from './votes.service.js';
 import { getIO } from '../../socket/index.js';
 
+// Debounce del emit de socket — agrupa ráfagas de votos en un solo evento
+// para no saturar al admin con 200 re-renders seguidos
+const _debounceTimers = new Map();
+function _debouncedEmit(io, key, event, data, delayMs = 800) {
+    if (_debounceTimers.has(key)) clearTimeout(_debounceTimers.get(key));
+    _debounceTimers.set(key, setTimeout(() => {
+        io.emit(event, data);
+        _debounceTimers.delete(key);
+    }, delayMs));
+}
+
 // POST /api/qr-votes
 // Admin: crea una sesión de votación (pública o de staff)
 // Body: { id_event, expires_at?, top_n, finalist_ids?, vote_type? }
@@ -79,7 +90,7 @@ const registerVote = async (req, res) => {
         const vote = await service.registerVote({ qr_vote_id, project_id, voter_token });
 
         const io = getIO();
-        if (io) io.emit('vote:new', { qr_vote_id, project_id, vote });
+        if (io) _debouncedEmit(io, `votes_event_${qr_vote_id}`, 'vote:new', { qr_vote_id, project_id });
 
         res.status(201).json({ success: true, message: '¡Voto registrado exitosamente!', vote });
     } catch (err) {

@@ -75,12 +75,21 @@ const findExistingVote = async ({ qr_vote_id, voter_token }) => {
 };
 
 const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_role = 'PUBLIC' }) => {
+    // INSERT ON CONFLICT elimina la race condition del SELECT+INSERT.
+    // Requiere: UNIQUE(qr_vote_id, voter_token) en public_votes.
     const result = await pool.query(
         `INSERT INTO public_votes (qr_vote_id, project_id, voter_token, voter_role)
          VALUES ($1, $2, $3, $4)
+         ON CONFLICT (qr_vote_id, voter_token) DO NOTHING
          RETURNING *`,
         [qr_vote_id, project_id, voter_token, voter_role]
     );
+    // Si DO NOTHING disparó, el token ya había votado
+    if (!result.rows[0]) {
+        const err = new Error('Ya registraste tu voto en esta sesión');
+        err.status = 409;
+        throw err;
+    }
     return result.rows[0];
 };
 

@@ -38,9 +38,9 @@ export const config = {
     ssl: process.env.DATABASE_URL
         ? { rejectUnauthorized: false }
         : process.env.DB_SSL === 'true' || false,
-    max: parseInt(process.env.DB_POOL_MAX) || 20,
+    max: parseInt(process.env.DB_POOL_MAX) || 10,
     idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT) || 30000,
-    connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT) || 2000
+    connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT) || 5000
   },
 
   n8n: {
