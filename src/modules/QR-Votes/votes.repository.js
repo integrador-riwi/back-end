@@ -1,24 +1,38 @@
 import pool from '../../db/pool.js';
 
-const createQrVote = async ({ qr_code_url, expires_at, id_event, created_by, top_n, finalist_ids }) => {
+const createQrVote = async ({ qr_code_url, expires_at, id_event, created_by, top_n, finalist_ids, vote_type = 'PUBLIC', staff_token = null }) => {
     const result = await pool.query(
-        `INSERT INTO qr_votes (qr_code_url, expires_at, active, id_event, created_by, top_n, finalist_ids)
-         VALUES ($1, $2, true, $3, $4, $5, $6)
+        `INSERT INTO qr_votes (qr_code_url, expires_at, active, id_event, created_by, top_n, finalist_ids, vote_type, staff_token)
+         VALUES ($1, $2, true, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
-        [qr_code_url, expires_at || null, id_event, created_by, top_n, JSON.stringify(finalist_ids || [])]
+        [qr_code_url, expires_at || null, id_event, created_by, top_n, JSON.stringify(finalist_ids || []), vote_type, staff_token]
     );
     return result.rows[0];
 };
 
-const getActiveQrByEvent = async (id_event) => {
+const getActiveQrByEvent = async (id_event, vote_type = 'PUBLIC') => {
     const result = await pool.query(
         `SELECT * FROM qr_votes
          WHERE id_event = $1
+           AND vote_type = $2
            AND active = true
            AND (expires_at IS NULL OR expires_at > NOW())
          ORDER BY id DESC
          LIMIT 1`,
-        [id_event]
+        [id_event, vote_type]
+    );
+    return result.rows[0] || null;
+};
+
+// Buscar QR de staff por su token privado (sin exponer el id)
+const getStaffQrByToken = async (staff_token) => {
+    const result = await pool.query(
+        `SELECT * FROM qr_votes
+         WHERE staff_token = $1
+           AND vote_type = 'STAFF'
+           AND active = true
+           AND (expires_at IS NULL OR expires_at > NOW())`,
+        [staff_token]
     );
     return result.rows[0] || null;
 };
@@ -45,7 +59,7 @@ const getQrsByEvent = async (id_event) => {
          FROM qr_votes qr
                   JOIN users u ON u.id_user = qr.created_by
          WHERE qr.id_event = $1
-         ORDER BY qr.id DESC`,
+         ORDER BY qr.vote_type, qr.id DESC`,
         [id_event]
     );
     return result.rows;
@@ -60,18 +74,17 @@ const findExistingVote = async ({ qr_vote_id, voter_token }) => {
     return result.rows[0] || null;
 };
 
-const registerVote = async ({ qr_vote_id, project_id, voter_token }) => {
+const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_role = 'PUBLIC' }) => {
     const result = await pool.query(
-        `INSERT INTO public_votes (qr_vote_id, project_id, voter_token)
-         VALUES ($1, $2, $3)
+        `INSERT INTO public_votes (qr_vote_id, project_id, voter_token, voter_role)
+         VALUES ($1, $2, $3, $4)
          RETURNING *`,
-        [qr_vote_id, project_id, voter_token]
+        [qr_vote_id, project_id, voter_token, voter_role]
     );
     return result.rows[0];
 };
 
 const getProjectsByEvent = async (id_event, top_n, finalist_ids) => {
-    // Si tenemos IDs exactos aprobados por el admin, usarlos directamente
     if (finalist_ids && finalist_ids.length > 0) {
         const result = await pool.query(
             `SELECT p.id_project, p.name, p.description, p.preview_photo_url,
@@ -83,7 +96,6 @@ const getProjectsByEvent = async (id_event, top_n, finalist_ids) => {
         );
         return result.rows;
     }
-    // Fallback: usar project_final_grade si no hay IDs guardados
     const result = await pool.query(
         `SELECT p.id_project, p.name, p.description, p.preview_photo_url,
                 t.name AS team_name
@@ -97,10 +109,13 @@ const getProjectsByEvent = async (id_event, top_n, finalist_ids) => {
     return result.rows;
 };
 
+// Resultados separados por tipo de votante
 const getVoteResultsByEvent = async (id_event) => {
     const result = await pool.query(
         `SELECT p.id_project, p.name AS project_name, t.name AS team_name,
-                COUNT(pv.id_vote) AS total_votes
+                COUNT(pv.id_vote)                                             AS total_votes,
+                COUNT(pv.id_vote) FILTER (WHERE pv.voter_role = 'PUBLIC')    AS public_votes,
+                COUNT(pv.id_vote) FILTER (WHERE pv.voter_role = 'STAFF')     AS staff_votes
          FROM projects p
                   JOIN teams t ON t.id_team = p.team_id
                   LEFT JOIN public_votes pv ON pv.project_id = p.id_project
@@ -122,12 +137,13 @@ const deleteVotesByEvent = async (id_event) => {
          RETURNING id_vote`,
         [id_event]
     );
-    return result.rowCount; // número de votos eliminados
+    return result.rowCount;
 };
 
 export {
     createQrVote,
     getActiveQrByEvent,
+    getStaffQrByToken,
     getQrById,
     toggleQrActive,
     getQrsByEvent,
@@ -135,5 +151,5 @@ export {
     registerVote,
     getProjectsByEvent,
     getVoteResultsByEvent,
-    deleteVotesByEvent
+    deleteVotesByEvent,
 };

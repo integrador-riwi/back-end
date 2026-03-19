@@ -9,9 +9,16 @@ import {
 
 const TOP_N = 3;
 
+// ── Pesos de la fórmula (según Excel Calculos_finalistas_PI) ──────────────────
+// Total = (10 - nota) * PESO_NOTA + votos_publico * PESO_PUBLICO + votos_staff * PESO_STAFF
+// Menor total = mejor posición (ranking ascendente)
+const PESO_NOTA    = 20;  // multiplicador de la penalización por nota
+const PESO_PUBLICO = 2;   // puntos por voto del público
+const PESO_STAFF   = 3;   // puntos por voto del staff
+
 const buildVotesMap = (voteCounts) =>
     voteCounts.reduce((map, row) => {
-      map[row.project_id] = row.votes_count;
+      map[row.project_id] = parseInt(row.votes_count, 10);
       return map;
     }, {});
 
@@ -49,34 +56,49 @@ export const calculateAndSaveFinalists = async (eventId, requestingRole) => {
     );
   }
 
-  const voteCounts = await FinalistsRepository.getVoteCountsByEvent(eventId);
-  const votesMap = buildVotesMap(voteCounts);
+  // Votos del público (tabla public_votes via qr_votes)
+  const publicVoteCounts = await FinalistsRepository.getVoteCountsByEvent(eventId);
+  const publicVotesMap   = buildVotesMap(publicVoteCounts);
 
-  const allVotes = projects.map((p) => votesMap[p.id_project] ?? 0);
-  const maxVotes = Math.max(...allVotes);
+  // Votos del staff (usuarios con role = 'STAFF' que votaron)
+  const staffVoteResult = await pool.query(
+    `SELECT pv.project_id, COUNT(pv.id_vote)::integer AS votes_count
+     FROM public_votes pv
+     JOIN qr_votes qr ON qr.id = pv.qr_vote_id
+     JOIN users u ON u.id_user::text = pv.voter_token
+     WHERE qr.id_event = $1 AND u.role = 'STAFF'
+     GROUP BY pv.project_id`,
+    [eventId],
+  );
+  const staffVotesMap = buildVotesMap(staffVoteResult.rows);
 
+  // Fórmula: Total = (10 - nota) * PESO_NOTA + votos_publico * PESO_PUBLICO + votos_staff * PESO_STAFF
+  // Menor total = mejor posición
   const scored = projects.map((p) => {
     const teamScore    = parseFloat(p.team_score);
-    const votes        = votesMap[p.id_project] ?? 0;
-    const second_grade = parseFloat((teamScore * 0.8).toFixed(4));
-    const votes_result = maxVotes > 0
-        ? parseFloat(((votes / maxVotes) * 100 * 0.2).toFixed(4))
-        : 0;
-    const final_grade  = parseFloat((second_grade + votes_result).toFixed(4));
+    const votesPublico = publicVotesMap[p.id_project] ?? 0;
+    const votesStaff   = staffVotesMap[p.id_project]  ?? 0;
+
+    const penalizacion_nota = parseFloat(((10 - teamScore) * PESO_NOTA).toFixed(4));
+    const puntos_publico    = parseFloat((votesPublico * PESO_PUBLICO).toFixed(4));
+    const puntos_staff      = parseFloat((votesStaff  * PESO_STAFF).toFixed(4));
+    const final_grade       = parseFloat((penalizacion_nota + puntos_publico + puntos_staff).toFixed(4));
 
     return {
-      id_project:   p.id_project,
-      project_name: p.project_name,
-      team_name:    p.team_name,
-      team_score:   teamScore,
-      votes_count:  votes,
-      second_grade,
-      votes_result,
+      id_project:        p.id_project,
+      project_name:      p.project_name,
+      team_name:         p.team_name,
+      team_score:        teamScore,
+      votes_count:       votesPublico,
+      votes_staff:       votesStaff,
+      second_grade:      penalizacion_nota,  // penalización por nota (campo reutilizado)
+      votes_result:      puntos_publico + puntos_staff,
       final_grade,
     };
   });
 
-  scored.sort((a, b) => b.final_grade - a.final_grade);
+  // Menor total = mejor posición (ascendente)
+  scored.sort((a, b) => a.final_grade - b.final_grade);
   const top3 = scored.slice(0, TOP_N);
 
   const saved = await FinalistsRepository.saveFinalists(eventId, top3);

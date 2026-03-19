@@ -1,35 +1,39 @@
 import { Router } from 'express';
 import * as controller from './votes.controller.js';
-import { authenticate } from "../../middleware/auth.js";
-import { hasRole, isAdminOrTeamLead } from "../../middleware/rbac.js";
+import { authenticate } from '../../middleware/auth.js';
+import { hasRole } from '../../middleware/rbac.js';
 
 const router = Router();
 
 // ─── Rutas de Admin (requieren JWT) ───────────────────────────────────────────
 
-// Crear sesión de votación QR para un evento
-// Body: { id_event, expires_at? }
-router.post('/', authenticate, controller.createQrVote);
+// Crear sesión de votación QR (pública o de staff)
+// Body: { id_event, expires_at?, top_n, finalist_ids?, vote_type: 'PUBLIC' | 'STAFF' }
+router.post('/', authenticate, hasRole('ADMIN'), controller.createQrVote);
 
-// Listar todos los QRs de un evento
+// Listar todos los QRs de un evento (públicos + staff)
 router.get('/event/:id', authenticate, controller.getQrsByEvent);
 
-// Ver resultados de votos públicos de un evento
+// Ver resultados desglosados (votos públicos y de staff)
 router.get('/event/:eventId/results', authenticate, controller.getResults);
 
 // Activar o desactivar un QR
-router.patch('/:id/toggle', authenticate, controller.toggleQrActive);
+router.patch('/:id/toggle', authenticate, hasRole('ADMIN'), controller.toggleQrActive);
 
-// ─── Rutas Públicas (sin JWT, accesibles desde el QR) ─────────────────────────
+// Eliminar todos los votos de un evento
+router.delete('/event/:eventId/votes', authenticate, hasRole('ADMIN'), controller.deleteVotesByEvent);
 
-// Obtener proyectos del evento para mostrar en la página de votación
+// ─── Rutas Públicas (sin JWT, accesibles desde el QR del público) ─────────────
+
+// Obtener proyectos para votar (sesión pública)
 router.get('/vote/:eventId/projects', controller.getProjectsForVoting);
 
-// Registrar voto de persona externa
-// Body: { qr_vote_id, project_id }
-router.post('/vote', controller.registerVote);
+// ─── Rutas de Staff (sin JWT, protegidas por token privado en la URL) ─────────
 
-// Eliminar todos los votos públicos de un evento
-router.delete('/event/:eventId/votes', authenticate, controller.deleteVotesByEvent);
+// Obtener proyectos para votar (sesión staff — el token en la URL ES la autenticación)
+router.get('/vote/staff/:staffToken/projects', controller.getProjectsForStaffVoting);
+
+// Registrar voto (tanto público como staff usan el mismo endpoint)
+router.post('/vote', controller.registerVote);
 
 export default router;
