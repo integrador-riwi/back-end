@@ -32,7 +32,7 @@ export const getFinalistsByEvent = async (eventId) => {
                   JOIN projects p ON p.id_project = f.id_project
                   JOIN teams t    ON t.id_team    = p.team_id
          WHERE f.event_id = $1
-         ORDER BY f.final_grade DESC NULLS LAST`,
+         ORDER BY f.final_grade ASC NULLS LAST`,
         [eventId],
     );
     return result.rows;
