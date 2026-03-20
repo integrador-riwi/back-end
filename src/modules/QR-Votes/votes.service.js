@@ -205,6 +205,4 @@ export {
     deleteVotesByEvent,
     auditVotesByEvent,
     auditVote,
-    generateVoteHash,
-    verifyVoteHash,
 };
