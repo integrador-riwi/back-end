@@ -94,15 +94,33 @@ const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_role = 
     return result.rows[0];
 };
 
+
 const getVoteById = async (voteId) => {
     const result = await pool.query(
-        `SELECT id_vote, qr_vote_id, project_id, voter_token, voter_role,
-                voter_ip, vote_hash, voted_at
-         FROM public_votes
-         WHERE id_vote = $1`,
+        `SELECT pv.id_vote, pv.qr_vote_id, pv.project_id, pv.voter_token,
+                pv.voter_role, pv.voter_ip, pv.vote_hash, pv.voted_at,
+                p.name AS project_name
+         FROM public_votes pv
+         LEFT JOIN projects p ON p.id_project = pv.project_id
+         WHERE pv.id_vote = $1`,
         [voteId]
     );
     return result.rows[0] || null;
+};
+
+const getVotesByEvent = async (eventId) => {
+    const result = await pool.query(
+        `SELECT pv.id_vote, pv.qr_vote_id, pv.project_id, pv.voter_token,
+                pv.voter_role, pv.voter_ip, pv.vote_hash, pv.voted_at,
+                p.name AS project_name
+         FROM public_votes pv
+         JOIN qr_votes qr ON qr.id = pv.qr_vote_id
+         LEFT JOIN projects p ON p.id_project = pv.project_id
+         WHERE qr.id_event = $1
+         ORDER BY pv.voted_at DESC`,
+        [eventId]
+    );
+    return result.rows;
 };
 
 const getProjectsByEvent = async (id_event, top_n, finalist_ids) => {
@@ -170,7 +188,9 @@ export {
     getQrsByEvent,
     findExistingVote,
     registerVote,
+    getVotesByEvent,
     getVoteById,
+    getVotesByEvent,
     getProjectsByEvent,
     getVoteResultsByEvent,
     deleteVotesByEvent,

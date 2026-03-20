@@ -23,8 +23,14 @@ router.patch('/:id/toggle', authenticate, hasRole('ADMIN'), controller.toggleQrA
 // Eliminar todos los votos de un evento
 router.delete('/event/:eventId/votes', authenticate, hasRole('ADMIN'), controller.deleteVotesByEvent);
 
+// Auditar todos los votos de un evento (resumen + detalle con veredicto HMAC)
+router.get('/event/:eventId/audit', authenticate, hasRole('ADMIN'), controller.auditVotesByEvent);
+
 // Auditar un voto específico (verificar firma HMAC)
 router.get('/audit/:voteId', authenticate, hasRole('ADMIN'), controller.auditVote);
+
+// Auditar todos los votos de un evento
+router.get('/event/:eventId/audit', authenticate, hasRole('ADMIN'), controller.auditVotesByEvent);
 
 // ─── Rutas Públicas (sin JWT, accesibles desde el QR del público) ─────────────
 

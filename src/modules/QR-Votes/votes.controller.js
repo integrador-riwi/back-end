@@ -131,6 +131,17 @@ const deleteVotesByEvent = async (req, res) => {
     }
 };
 
+// GET /api/qr-votes/event/:eventId/audit
+// Admin: audita todos los votos de un evento y devuelve resumen + detalle
+const auditVotesByEvent = async (req, res) => {
+    try {
+        const result = await service.auditVotesByEvent(req.params.eventId);
+        res.json({ success: true, ...result });
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message || 'Error al auditar votos' });
+    }
+};
+
 // GET /api/qr-votes/audit/:voteId
 // Admin: verifica si un voto específico tiene firma HMAC válida
 const auditVote = async (req, res) => {
@@ -142,6 +153,7 @@ const auditVote = async (req, res) => {
     }
 };
 
+
 export {
     createQrVote,
     getQrsByEvent,
@@ -152,4 +164,5 @@ export {
     getResults,
     deleteVotesByEvent,
     auditVote,
+    auditVotesByEvent,
 };
