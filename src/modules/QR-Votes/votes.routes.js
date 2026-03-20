@@ -17,6 +17,9 @@ router.get('/event/:id', authenticate, controller.getQrsByEvent);
 // Ver resultados desglosados (votos públicos y de staff)
 router.get('/event/:eventId/results', authenticate, controller.getResults);
 
+// Regenerar imagen QR del QR activo de un evento
+router.get('/event/:eventId/image', authenticate, controller.regenerateQrImage);
+
 // Activar o desactivar un QR
 router.patch('/:id/toggle', authenticate, hasRole('ADMIN'), controller.toggleQrActive);
 

@@ -69,15 +69,18 @@ export const getTopProjectsByScore = async (eventId, limit = 3) => {
 };
 
 export const getVoteCountsByEvent = async (eventId) => {
+    // Returns points per project (pos1=3pts, pos2=2pts, pos3=1pt)
     const result = await pool.query(
         `SELECT
-             pv.project_id,
-             COUNT(pv.id_vote)::integer AS votes_count
-         FROM public_votes pv
+             vr.project_id,
+             COALESCE(SUM(vr.points), 0)::integer AS votes_count
+         FROM vote_rankings vr
+                  JOIN public_votes pv ON pv.id_vote = vr.id_vote
                   JOIN qr_votes qr ON qr.id = pv.qr_vote_id
          WHERE qr.id_event = $1
            AND pv.vote_hash IS NOT NULL
-         GROUP BY pv.project_id`,
+           AND pv.voter_role = 'PUBLIC'
+         GROUP BY vr.project_id`,
         [eventId],
     );
     return result.rows;

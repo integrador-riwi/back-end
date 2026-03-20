@@ -14,11 +14,11 @@ import { config } from '../../config/env.js';
  * Payload firmado: qr_vote_id|project_id|voter_token|voted_at
  */
 export function generateVoteHash({ qr_vote_id, project_id, voter_token, voted_at }) {
-  const payload = `${qr_vote_id}|${project_id}|${voter_token}|${voted_at}`;
-  return crypto
-    .createHmac('sha256', config.votes.hmacSecret)
-    .update(payload)
-    .digest('hex');
+    const payload = `${qr_vote_id}|${project_id}|${voter_token}|${voted_at}`;
+    return crypto
+        .createHmac('sha256', config.votes.hmacSecret)
+        .update(payload)
+        .digest('hex');
 }
 
 /**
@@ -26,12 +26,12 @@ export function generateVoteHash({ qr_vote_id, project_id, voter_token, voted_at
  * Usa comparación en tiempo constante para evitar timing attacks.
  */
 export function verifyVoteHash({ qr_vote_id, project_id, voter_token, voted_at, vote_hash }) {
-  if (!vote_hash) return false;
-  const expected = generateVoteHash({ qr_vote_id, project_id, voter_token, voted_at });
-  return crypto.timingSafeEqual(
-    Buffer.from(expected, 'hex'),
-    Buffer.from(vote_hash, 'hex')
-  );
+    if (!vote_hash) return false;
+    const expected = generateVoteHash({ qr_vote_id, project_id, voter_token, voted_at });
+    return crypto.timingSafeEqual(
+        Buffer.from(expected, 'hex'),
+        Buffer.from(vote_hash, 'hex')
+    );
 }
 
 // ── Crear sesión de votación (pública o de staff) ────────────────────────────
@@ -104,7 +104,7 @@ const getProjectsForStaffVoting = async (staff_token) => {
 };
 
 // ── Registrar voto (público o staff) ─────────────────────────────────────────
-const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_ip = null }) => {
+const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_ip = null, podium = [] }) => {
     const qr = await repo.getQrById(qr_vote_id);
 
     if (!qr || !qr.active)
@@ -115,16 +115,29 @@ const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_ip = nu
     const existing = await repo.findExistingVote({ qr_vote_id, voter_token });
     if (existing) throw { status: 409, message: 'Ya registraste tu voto en esta sesión' };
 
+    // Validate podium: must have exactly 3 entries with positions 1, 2, 3
+    if (podium && podium.length > 0) {
+        if (podium.length !== 3) throw { status: 400, message: 'El podio debe tener exactamente 3 proyectos' };
+        const positions = podium.map(p => p.position).sort();
+        if (JSON.stringify(positions) !== JSON.stringify([1, 2, 3]))
+            throw { status: 400, message: 'El podio debe tener posiciones 1, 2 y 3' };
+    }
+
     // El voter_role queda registrado según el tipo de sesión QR
     const voter_role = qr.vote_type === 'STAFF' ? 'STAFF' : 'PUBLIC';
 
     // Timestamp fijo para que el hash sea determinista
     const voted_at = new Date().toISOString();
 
-    // Firma criptográfica del voto — prueba de que pasó por la API
-    const vote_hash = generateVoteHash({ qr_vote_id, project_id, voter_token, voted_at });
+    // El project_id principal es siempre el 1er lugar del podio
+    const primaryProjectId = podium.length > 0
+        ? podium.find(p => p.position === 1)?.project_id ?? project_id
+        : project_id;
 
-    return repo.registerVote({ qr_vote_id, project_id, voter_token, voter_role, voter_ip, vote_hash, voted_at });
+    // Firma criptográfica del voto
+    const vote_hash = generateVoteHash({ qr_vote_id, project_id: primaryProjectId, voter_token, voted_at });
+
+    return repo.registerVote({ qr_vote_id, project_id: primaryProjectId, voter_token, voter_role, voter_ip, vote_hash, voted_at, podium });
 };
 
 const getResults = async (id_event) => {
@@ -194,6 +207,15 @@ function _parseFinalistIds(raw) {
     return raw;
 }
 
+// ── Regenerar imagen QR del QR activo de un evento ───────────────────────────
+const regenerateQrImage = async (id_event) => {
+    const activeQr = await repo.getActiveQrByEvent(id_event, 'PUBLIC');
+    if (!activeQr) throw { status: 404, message: 'No hay un QR activo para este evento' };
+
+    const qrImage = await QRCode.toDataURL(activeQr.qr_code_url);
+    return { qrImage, qr_code_url: activeQr.qr_code_url };
+};
+
 export {
     createQrVote,
     getQrsByEvent,
@@ -205,4 +227,5 @@ export {
     deleteVotesByEvent,
     auditVotesByEvent,
     auditVote,
+    regenerateQrImage,
 };

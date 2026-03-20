@@ -88,20 +88,26 @@ const getProjectsForStaffVoting = async (req, res) => {
 };
 
 // POST /api/vote
-// Público / Staff: registra el voto
-// Body: { qr_vote_id, project_id, voter_token }
+// Público / Staff: registra el voto con podio de 3 posiciones
+// Body: { qr_vote_id, project_id, voter_token, podium: [{project_id, position}] }
 const registerVote = async (req, res) => {
     try {
-        const { qr_vote_id, project_id, voter_token } = req.body;
+        const { qr_vote_id, project_id, voter_token, podium } = req.body;
 
-        if (!qr_vote_id || !project_id || !voter_token)
-            return res.status(400).json({ error: 'qr_vote_id, project_id y voter_token son requeridos' });
+        if (!qr_vote_id || !voter_token)
+            return res.status(400).json({ error: 'qr_vote_id y voter_token son requeridos' });
+
+        // podium is required: [{project_id, position: 1|2|3}]
+        if (!podium || !Array.isArray(podium) || podium.length !== 3)
+            return res.status(400).json({ error: 'podium debe ser un array con exactamente 3 proyectos' });
 
         const voter_ip = getClientIp(req);
-        const vote = await service.registerVote({ qr_vote_id, project_id, voter_token, voter_ip });
+        // project_id principal = 1er lugar del podio
+        const primaryId = project_id ?? podium.find(p => p.position === 1)?.project_id;
+        const vote = await service.registerVote({ qr_vote_id, project_id: primaryId, voter_token, voter_ip, podium });
 
         const io = getIO();
-        if (io) _debouncedEmit(io, `votes_event_${qr_vote_id}`, 'vote:new', { qr_vote_id, project_id });
+        if (io) _debouncedEmit(io, `votes_event_${qr_vote_id}`, 'vote:new', { qr_vote_id, project_id: primaryId });
 
         res.status(201).json({ success: true, message: '¡Voto registrado exitosamente!', vote });
     } catch (err) {
@@ -153,6 +159,17 @@ const auditVote = async (req, res) => {
     }
 };
 
+// GET /api/qr-votes/event/:eventId/image
+// Admin: regenera la imagen QR del QR activo del evento
+const regenerateQrImage = async (req, res) => {
+    try {
+        const result = await service.regenerateQrImage(req.params.eventId);
+        res.json({ success: true, ...result });
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message || 'Error al regenerar QR' });
+    }
+};
+
 export {
     createQrVote,
     getQrsByEvent,
@@ -164,4 +181,5 @@ export {
     deleteVotesByEvent,
     auditVote,
     auditVotesByEvent,
+    regenerateQrImage,
 };

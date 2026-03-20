@@ -74,24 +74,63 @@ const findExistingVote = async ({ qr_vote_id, voter_token }) => {
     return result.rows[0] || null;
 };
 
-const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_role = 'PUBLIC', voter_ip = null, vote_hash = null, voted_at = null }) => {
+const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_role = 'PUBLIC', voter_ip = null, vote_hash = null, voted_at = null, podium = [] }) => {
     // INSERT ON CONFLICT elimina la race condition del SELECT+INSERT.
     // Requiere: UNIQUE(qr_vote_id, voter_token) en public_votes.
     const votedAtValue = voted_at ? new Date(voted_at) : new Date();
-    const result = await pool.query(
-        `INSERT INTO public_votes (qr_vote_id, project_id, voter_token, voter_role, voter_ip, vote_hash, voted_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (qr_vote_id, voter_token) DO NOTHING
-         RETURNING *`,
-        [qr_vote_id, project_id, voter_token, voter_role, voter_ip, vote_hash, votedAtValue]
-    );
-    // Si DO NOTHING disparó, el token ya había votado
-    if (!result.rows[0]) {
-        const err = new Error('Ya registraste tu voto en esta sesión');
-        err.status = 409;
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const result = await client.query(
+            `INSERT INTO public_votes (qr_vote_id, project_id, voter_token, voter_role, voter_ip, vote_hash, voted_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT (qr_vote_id, voter_token) DO NOTHING
+             RETURNING *`,
+            [qr_vote_id, project_id, voter_token, voter_role, voter_ip, vote_hash, votedAtValue]
+        );
+
+        // Si DO NOTHING disparó, el token ya había votado
+        if (!result.rows[0]) {
+            await client.query('ROLLBACK');
+            const err = new Error('Ya registraste tu voto en esta sesión');
+            err.status = 409;
+            throw err;
+        }
+
+        const voteId = result.rows[0].id_vote;
+
+        // Points map: position 1=3pts, 2=2pts, 3=1pt
+        const pointsMap = { 1: 3, 2: 2, 3: 1 };
+
+        // Insert ranked podium entries
+        if (podium && podium.length > 0) {
+            for (const entry of podium) {
+                const points = pointsMap[entry.position] ?? (4 - entry.position);
+                await client.query(
+                    `INSERT INTO vote_rankings (id_vote, project_id, position, points)
+                     VALUES ($1, $2, $3, $4)`,
+                    [voteId, entry.project_id, entry.position, points]
+                );
+            }
+        } else {
+            // Fallback: single vote treated as 1st place = 3pts
+            await client.query(
+                `INSERT INTO vote_rankings (id_vote, project_id, position, points)
+                 VALUES ($1, $2, 1, 3)`,
+                [voteId, project_id]
+            );
+        }
+
+        await client.query('COMMIT');
+        return result.rows[0];
+    } catch (err) {
+        await client.query('ROLLBACK');
         throw err;
+    } finally {
+        client.release();
     }
-    return result.rows[0];
 };
 
 const getVoteById = async (voteId) => {
@@ -100,7 +139,7 @@ const getVoteById = async (voteId) => {
                 pv.voter_role, pv.voter_ip, pv.vote_hash, pv.voted_at,
                 p.name AS project_name
          FROM public_votes pv
-         LEFT JOIN projects p ON p.id_project = pv.project_id
+                  LEFT JOIN projects p ON p.id_project = pv.project_id
          WHERE pv.id_vote = $1`,
         [voteId]
     );
@@ -113,8 +152,8 @@ const getVotesByEvent = async (eventId) => {
                 pv.voter_role, pv.voter_ip, pv.vote_hash, pv.voted_at,
                 p.name AS project_name
          FROM public_votes pv
-         JOIN qr_votes qr ON qr.id = pv.qr_vote_id
-         LEFT JOIN projects p ON p.id_project = pv.project_id
+                  JOIN qr_votes qr ON qr.id = pv.qr_vote_id
+                  LEFT JOIN projects p ON p.id_project = pv.project_id
          WHERE qr.id_event = $1
          ORDER BY pv.voted_at DESC`,
         [eventId]
@@ -147,18 +186,24 @@ const getProjectsByEvent = async (id_event, top_n, finalist_ids) => {
     return result.rows;
 };
 
-// Resultados separados por tipo de votante
+// Resultados por puntos del podio (pos1=3pts, pos2=2pts, pos3=1pt)
 const getVoteResultsByEvent = async (id_event) => {
     const result = await pool.query(
-        `SELECT p.id_project, p.name AS project_name, t.name AS team_name,
-                COUNT(pv.id_vote)                                             AS total_votes,
-                COUNT(pv.id_vote) FILTER (WHERE pv.voter_role = 'PUBLIC')    AS public_votes,
-                COUNT(pv.id_vote) FILTER (WHERE pv.voter_role = 'STAFF')     AS staff_votes
+        `SELECT
+             p.id_project,
+             p.name AS project_name,
+             t.name AS team_name,
+             COALESCE(SUM(vr.points), 0)::integer                                           AS total_votes,
+             COALESCE(SUM(vr.points) FILTER (WHERE pv.voter_role = 'PUBLIC'), 0)::integer   AS public_votes,
+             COALESCE(SUM(vr.points) FILTER (WHERE pv.voter_role = 'STAFF'),  0)::integer   AS staff_votes,
+             COUNT(DISTINCT pv.id_vote) FILTER (WHERE pv.voter_role = 'PUBLIC')::integer    AS public_ballots,
+             COUNT(DISTINCT pv.id_vote) FILTER (WHERE pv.voter_role = 'STAFF')::integer     AS staff_ballots
          FROM projects p
-                  JOIN teams t ON t.id_team = p.team_id
-                  LEFT JOIN public_votes pv ON pv.project_id = p.id_project
-                      AND pv.vote_hash IS NOT NULL
-                  LEFT JOIN qr_votes qr ON qr.id = pv.qr_vote_id AND qr.id_event = $1
+         JOIN teams t ON t.id_team = p.team_id
+         LEFT JOIN vote_rankings vr ON vr.project_id = p.id_project
+         LEFT JOIN public_votes pv ON pv.id_vote = vr.id_vote
+             AND pv.vote_hash IS NOT NULL
+         LEFT JOIN qr_votes qr ON qr.id = pv.qr_vote_id AND qr.id_event = $1
          WHERE p.id_event = $1
          GROUP BY p.id_project, p.name, t.name
          ORDER BY total_votes DESC`,

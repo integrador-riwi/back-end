@@ -12,7 +12,8 @@ const TOP_N = 3;
 // ── Fórmula del ganador ───────────────────────────────────────────────────────
 // final_grade = nota_puntaje + staff_puntaje + publico_puntaje   (MENOR = MEJOR)
 //
-// nota_puntaje    = (10 - team_score) * 20
+// team_score viene en escala 0-100, se divide entre 10 para convertir a 0-10
+// nota_puntaje    = (10 - team_score/10) * 20
 // staff_puntaje   = posición_staff   * 3
 // publico_puntaje = posición_publico * 2
 //
@@ -31,23 +32,35 @@ const buildVotesMap = (voteCounts) =>
  * El más votado = posición 1. Empate → misma posición, el siguiente salta.
  * Ej: votos [10, 10, 7, 5] → posiciones [1, 1, 3, 4]
  */
+/**
+ * Asigna posiciones de ranking con manejo correcto de empates y sin votos.
+ *
+ * Reglas:
+ * - Más puntos = posición 1 (mejor).
+ * - Empate → misma posición. El siguiente salta (ej: [1,1,3,4]).
+ * - Sin votos (0 pts) → se les asigna la posición que les toca por orden,
+ *   también con empate (todos los de 0 pts comparten la misma posición).
+ *
+ * Ejemplo con 5 proyectos: votos [10,10,7,0,0]
+ *   → posiciones [1, 1, 3, 4, 4]
+ */
 const assignVotePositions = (projects, votesMap) => {
   const sorted = [...projects].sort((a, b) => {
     return (votesMap[b.id_project] ?? 0) - (votesMap[a.id_project] ?? 0);
   });
 
   const positionMap = {};
-  let position = 1;
 
   for (let i = 0; i < sorted.length; i++) {
     const currentVotes  = votesMap[sorted[i].id_project] ?? 0;
     const previousVotes = i === 0 ? null : (votesMap[sorted[i - 1].id_project] ?? 0);
 
     if (i === 0 || currentVotes === previousVotes) {
-      positionMap[sorted[i].id_project] = position;
+      // Empate o primer elemento: misma posición que el anterior (o 1 si es el primero)
+      positionMap[sorted[i].id_project] = i === 0 ? 1 : positionMap[sorted[i - 1].id_project];
     } else {
-      position = i + 1;
-      positionMap[sorted[i].id_project] = position;
+      // Posición real = índice + 1 (salta los empates anteriores)
+      positionMap[sorted[i].id_project] = i + 1;
     }
   }
 
@@ -69,10 +82,10 @@ export const calculateAndSaveFinalists = async (eventId, requestingRole) => {
 
   const rankingCheck = await pool.query(
       `SELECT 1
-     FROM individual_project_results ipr
-     JOIN projects p ON p.id_project = ipr.project_id
-     WHERE p.id_event = $1
-     LIMIT 1`,
+       FROM individual_project_results ipr
+              JOIN projects p ON p.id_project = ipr.project_id
+       WHERE p.id_event = $1
+       LIMIT 1`,
       [eventId],
   );
   if (!rankingCheck.rows.length) {
@@ -92,16 +105,17 @@ export const calculateAndSaveFinalists = async (eventId, requestingRole) => {
   const publicVoteCounts = await FinalistsRepository.getVoteCountsByEvent(eventId);
   const publicVotesMap   = buildVotesMap(publicVoteCounts);
 
-  // Votos del staff
+  // Votos del staff (usando puntos del podio: pos1=3pts, pos2=2pts, pos3=1pt)
   const staffVoteResult = await pool.query(
-    `SELECT pv.project_id, COUNT(pv.id_vote)::integer AS votes_count
-     FROM public_votes pv
-     JOIN qr_votes qr ON qr.id = pv.qr_vote_id
-     WHERE qr.id_event = $1
-       AND pv.voter_role = 'STAFF'
-       AND pv.vote_hash IS NOT NULL
-     GROUP BY pv.project_id`,
-    [eventId],
+      `SELECT vr.project_id, COALESCE(SUM(vr.points), 0)::integer AS votes_count
+       FROM vote_rankings vr
+              JOIN public_votes pv ON pv.id_vote = vr.id_vote
+              JOIN qr_votes qr ON qr.id = pv.qr_vote_id
+       WHERE qr.id_event = $1
+         AND pv.voter_role = 'STAFF'
+         AND pv.vote_hash IS NOT NULL
+       GROUP BY vr.project_id`,
+      [eventId],
   );
   const staffVotesMap = buildVotesMap(staffVoteResult.rows);
 
@@ -110,11 +124,11 @@ export const calculateAndSaveFinalists = async (eventId, requestingRole) => {
   const publicPositionMap  = assignVotePositions(projects, publicVotesMap);
 
   // Fórmula: final_grade = nota_puntaje + staff_puntaje + publico_puntaje  (MENOR = MEJOR)
-  //   nota_puntaje    = (10 - team_score) * 20
+  //   nota_puntaje    = (10 - team_score/10) * 20   ← team_score 0-100 → 0-10
   //   staff_puntaje   = posición_staff   * 3
   //   publico_puntaje = posición_publico * 2
   const scored = projects.map((p) => {
-    const teamScore      = parseFloat(p.team_score);
+    const teamScore      = parseFloat(p.team_score) / 10;  // convert 0-100 → 0-10
     const votesPublico   = publicVotesMap[p.id_project] ?? 0;
     const votesStaff     = staffVotesMap[p.id_project]  ?? 0;
     const posStaff       = staffPositionMap[p.id_project]  ?? projects.length;
