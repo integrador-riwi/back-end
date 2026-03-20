@@ -209,6 +209,14 @@ function _parseFinalistIds(raw) {
     return raw;
 }
 
+// ── Obtener imagen QR de cualquier sesión por su id ──────────────────────────
+const getQrImageById = async (id) => {
+    const qr = await repo.getQrById(id);
+    if (!qr) throw { status: 404, message: 'QR no encontrado' };
+    const qrImage = await QRCode.toDataURL(qr.qr_code_url);
+    return { qrImage, qr_code_url: qr.qr_code_url };
+};
+
 // ── Regenerar imagen QR del QR activo de un evento ───────────────────────────
 const regenerateQrImage = async (id_event) => {
     const activeQr = await repo.getActiveQrByEvent(id_event, 'PUBLIC');
@@ -230,4 +238,5 @@ export {
     auditVotesByEvent,
     auditVote,
     regenerateQrImage,
+    getQrImageById,
 };

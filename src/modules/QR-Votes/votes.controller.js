@@ -159,8 +159,16 @@ const auditVote = async (req, res) => {
     }
 };
 
-// GET /api/qr-votes/event/:eventId/image
-// Admin: regenera la imagen QR del QR activo del evento
+// GET /api/qr-votes/:id/image
+// Admin: genera imagen QR para cualquier sesión (pública o staff) por su id
+const getQrImage = async (req, res) => {
+    try {
+        const result = await service.getQrImageById(req.params.id);
+        res.json({ success: true, ...result });
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message || 'Error al generar imagen QR' });
+    }
+};
 const regenerateQrImage = async (req, res) => {
     try {
         const result = await service.regenerateQrImage(req.params.eventId);
@@ -182,4 +190,5 @@ export {
     auditVote,
     auditVotesByEvent,
     regenerateQrImage,
+    getQrImage,
 };
