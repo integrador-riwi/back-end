@@ -55,8 +55,8 @@ const createQrVote = async ({ id_event, expires_at, created_by, top_n, finalist_
         staff_token,
     });
 
-    // Solo generar imagen QR para sesiones públicas
-    const qrImage = isStaff ? null : await QRCode.toDataURL(votePageUrl);
+    // Generar imagen QR tanto para sesiones públicas como de staff
+    const qrImage = await QRCode.toDataURL(votePageUrl);
 
     return { qrVote, qrImage, votePageUrl };
 };
