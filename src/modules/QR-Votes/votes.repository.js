@@ -74,15 +74,16 @@ const findExistingVote = async ({ qr_vote_id, voter_token }) => {
     return result.rows[0] || null;
 };
 
-const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_role = 'PUBLIC' }) => {
+const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_role = 'PUBLIC', voter_ip = null, vote_hash = null, voted_at = null }) => {
     // INSERT ON CONFLICT elimina la race condition del SELECT+INSERT.
     // Requiere: UNIQUE(qr_vote_id, voter_token) en public_votes.
+    const votedAtValue = voted_at ? new Date(voted_at) : new Date();
     const result = await pool.query(
-        `INSERT INTO public_votes (qr_vote_id, project_id, voter_token, voter_role)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO public_votes (qr_vote_id, project_id, voter_token, voter_role, voter_ip, vote_hash, voted_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (qr_vote_id, voter_token) DO NOTHING
          RETURNING *`,
-        [qr_vote_id, project_id, voter_token, voter_role]
+        [qr_vote_id, project_id, voter_token, voter_role, voter_ip, vote_hash, votedAtValue]
     );
     // Si DO NOTHING disparó, el token ya había votado
     if (!result.rows[0]) {
@@ -91,6 +92,17 @@ const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_role = 
         throw err;
     }
     return result.rows[0];
+};
+
+const getVoteById = async (voteId) => {
+    const result = await pool.query(
+        `SELECT id_vote, qr_vote_id, project_id, voter_token, voter_role,
+                voter_ip, vote_hash, voted_at
+         FROM public_votes
+         WHERE id_vote = $1`,
+        [voteId]
+    );
+    return result.rows[0] || null;
 };
 
 const getProjectsByEvent = async (id_event, top_n, finalist_ids) => {
@@ -158,6 +170,7 @@ export {
     getQrsByEvent,
     findExistingVote,
     registerVote,
+    getVoteById,
     getProjectsByEvent,
     getVoteResultsByEvent,
     deleteVotesByEvent,

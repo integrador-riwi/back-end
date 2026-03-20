@@ -1,6 +1,16 @@
 import * as service from './votes.service.js';
 import { getIO } from '../../socket/index.js';
 
+// Extrae la IP real del votante respetando proxies (Vercel, Render, etc.)
+function getClientIp(req) {
+    return (
+        req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+        req.headers['x-real-ip'] ||
+        req.socket?.remoteAddress ||
+        null
+    );
+}
+
 // Debounce del emit de socket — agrupa ráfagas de votos en un solo evento
 // para no saturar al admin con 200 re-renders seguidos
 const _debounceTimers = new Map();
@@ -87,7 +97,8 @@ const registerVote = async (req, res) => {
         if (!qr_vote_id || !project_id || !voter_token)
             return res.status(400).json({ error: 'qr_vote_id, project_id y voter_token son requeridos' });
 
-        const vote = await service.registerVote({ qr_vote_id, project_id, voter_token });
+        const voter_ip = getClientIp(req);
+        const vote = await service.registerVote({ qr_vote_id, project_id, voter_token, voter_ip });
 
         const io = getIO();
         if (io) _debouncedEmit(io, `votes_event_${qr_vote_id}`, 'vote:new', { qr_vote_id, project_id });
@@ -120,6 +131,17 @@ const deleteVotesByEvent = async (req, res) => {
     }
 };
 
+// GET /api/qr-votes/audit/:voteId
+// Admin: verifica si un voto específico tiene firma HMAC válida
+const auditVote = async (req, res) => {
+    try {
+        const result = await service.auditVote(req.params.voteId);
+        res.json({ success: true, audit: result });
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message || 'Error al auditar voto' });
+    }
+};
+
 export {
     createQrVote,
     getQrsByEvent,
@@ -129,4 +151,5 @@ export {
     registerVote,
     getResults,
     deleteVotesByEvent,
+    auditVote,
 };
