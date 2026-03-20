@@ -10,7 +10,7 @@ dotenv.config({ path: join(__dirname, '../../.env') });
 const isProduction = process.env.NODE_ENV === 'production';
 
 const requiredEnvVars = isProduction
-    ? ['JWT_SECRET']
+    ? ['JWT_SECRET', 'VOTE_HMAC_SECRET']
     : ['DB_PASSWORD', 'JWT_SECRET'];
 
 const missing = requiredEnvVars.filter(key => !process.env[key]);
@@ -66,6 +66,10 @@ export const config = {
 
   openai: {
     apiKey: process.env.OPENAI_API_KEY
+  },
+
+  votes: {
+    hmacSecret: process.env.VOTE_HMAC_SECRET || 'change-this-vote-secret-in-production'
   },
 
   cloudinary: {
