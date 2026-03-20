@@ -76,6 +76,7 @@ export const getVoteCountsByEvent = async (eventId) => {
          FROM public_votes pv
                   JOIN qr_votes qr ON qr.id = pv.qr_vote_id
          WHERE qr.id_event = $1
+           AND pv.vote_hash IS NOT NULL
          GROUP BY pv.project_id`,
         [eventId],
     );

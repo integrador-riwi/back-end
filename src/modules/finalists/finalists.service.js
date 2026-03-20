@@ -97,7 +97,9 @@ export const calculateAndSaveFinalists = async (eventId, requestingRole) => {
     `SELECT pv.project_id, COUNT(pv.id_vote)::integer AS votes_count
      FROM public_votes pv
      JOIN qr_votes qr ON qr.id = pv.qr_vote_id
-     WHERE qr.id_event = $1 AND pv.voter_role = 'STAFF'
+     WHERE qr.id_event = $1
+       AND pv.voter_role = 'STAFF'
+       AND pv.vote_hash IS NOT NULL
      GROUP BY pv.project_id`,
     [eventId],
   );

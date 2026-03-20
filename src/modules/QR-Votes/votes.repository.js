@@ -157,6 +157,7 @@ const getVoteResultsByEvent = async (id_event) => {
          FROM projects p
                   JOIN teams t ON t.id_team = p.team_id
                   LEFT JOIN public_votes pv ON pv.project_id = p.id_project
+                      AND pv.vote_hash IS NOT NULL
                   LEFT JOIN qr_votes qr ON qr.id = pv.qr_vote_id AND qr.id_event = $1
          WHERE p.id_event = $1
          GROUP BY p.id_project, p.name, t.name
