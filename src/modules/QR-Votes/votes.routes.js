@@ -45,7 +45,7 @@ router.get('/vote/:eventId/projects', controller.getProjectsForVoting);
 // Obtener proyectos para votar (sesión staff — el token en la URL ES la autenticación)
 router.get('/vote/staff/:staffToken/projects', controller.getProjectsForStaffVoting);
 
-// Registrar voto (tanto público como staff usan el mismo endpoint)
-router.post('/vote', controller.registerVote);
+// Verificar si una cédula ya votó en una sesión QR (sin autenticación)
+router.get('/vote/:qrVoteId/check-cedula', controller.checkCedula);
 
 export default router;

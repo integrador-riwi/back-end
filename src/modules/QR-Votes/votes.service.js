@@ -226,6 +226,12 @@ const regenerateQrImage = async (id_event) => {
     return { qrImage, qr_code_url: activeQr.qr_code_url };
 };
 
+// ── Verificar si una cédula ya votó en una sesión ────────────────────────────
+const checkCedulaVoted = async (qrVoteId, documento) => {
+    const existing = await repo.findExistingVoteByDocumento({ qr_vote_id: qrVoteId, voter_documento: documento });
+    return !!existing;
+};
+
 export {
     createQrVote,
     getQrsByEvent,
@@ -239,4 +245,5 @@ export {
     auditVote,
     regenerateQrImage,
     getQrImageById,
+    checkCedulaVoted,
 };

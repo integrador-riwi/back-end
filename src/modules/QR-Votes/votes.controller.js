@@ -178,6 +178,20 @@ const regenerateQrImage = async (req, res) => {
     }
 };
 
+// GET /api/qr-votes/vote/:qrVoteId/check-cedula?documento=123
+// Público: verifica si una cédula ya votó en esta sesión
+const checkCedula = async (req, res) => {
+    try {
+        const { qrVoteId } = req.params;
+        const { documento } = req.query;
+        if (!documento) return res.status(400).json({ error: 'documento es requerido' });
+        const already_voted = await service.checkCedulaVoted(qrVoteId, documento);
+        res.json({ already_voted });
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message || 'Error al verificar cédula' });
+    }
+};
+
 export {
     createQrVote,
     getQrsByEvent,
@@ -191,4 +205,5 @@ export {
     auditVotesByEvent,
     regenerateQrImage,
     getQrImage,
+    checkCedula,
 };
