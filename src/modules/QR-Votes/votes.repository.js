@@ -65,6 +65,15 @@ const getQrsByEvent = async (id_event) => {
     return result.rows;
 };
 
+const findExistingVoteByDocumento = async ({ qr_vote_id, voter_documento }) => {
+    const result = await pool.query(
+        `SELECT id_vote FROM public_votes
+         WHERE qr_vote_id = $1 AND voter_documento = $2`,
+        [qr_vote_id, voter_documento]
+    );
+    return result.rows[0] || null;
+};
+
 const findExistingVote = async ({ qr_vote_id, voter_token }) => {
     const result = await pool.query(
         `SELECT id_vote FROM public_votes
@@ -75,13 +84,26 @@ const findExistingVote = async ({ qr_vote_id, voter_token }) => {
 };
 
 const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_role = 'PUBLIC', voter_ip = null, vote_hash = null, voted_at = null, podium = [], voter_documento = null, voter_nombre = null }) => {
-    // INSERT ON CONFLICT elimina la race condition del SELECT+INSERT.
-    // Requiere: UNIQUE(qr_vote_id, voter_token) en public_votes.
     const votedAtValue = voted_at ? new Date(voted_at) : new Date();
 
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+
+        // Bloquear por cédula si viene informada (evita doble voto aunque cambien de dispositivo)
+        if (voter_documento) {
+            const byDoc = await client.query(
+                `SELECT id_vote FROM public_votes
+                 WHERE qr_vote_id = $1 AND voter_documento = $2`,
+                [qr_vote_id, voter_documento]
+            );
+            if (byDoc.rows[0]) {
+                await client.query('ROLLBACK');
+                const err = new Error('Esta cédula ya registró un voto en esta sesión');
+                err.status = 409;
+                throw err;
+            }
+        }
 
         const result = await client.query(
             `INSERT INTO public_votes (qr_vote_id, project_id, voter_token, voter_role, voter_ip, vote_hash, voted_at, voter_documento, voter_nombre)
@@ -234,6 +256,7 @@ export {
     toggleQrActive,
     getQrsByEvent,
     findExistingVote,
+    findExistingVoteByDocumento,
     registerVote,
     getVoteById,
     getVotesByEvent,
