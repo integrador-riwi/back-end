@@ -42,6 +42,9 @@ router.get('/vote/:eventId/projects', controller.getProjectsForVoting);
 
 // ─── Rutas de Staff (sin JWT, protegidas por token privado en la URL) ─────────
 
+// Registrar voto (tanto público como staff usan el mismo endpoint)
+router.post('/vote', controller.registerVote);
+
 // Obtener proyectos para votar (sesión staff — el token en la URL ES la autenticación)
 router.get('/vote/staff/:staffToken/projects', controller.getProjectsForStaffVoting);
 
