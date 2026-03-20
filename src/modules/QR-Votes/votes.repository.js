@@ -74,7 +74,7 @@ const findExistingVote = async ({ qr_vote_id, voter_token }) => {
     return result.rows[0] || null;
 };
 
-const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_role = 'PUBLIC', voter_ip = null, vote_hash = null, voted_at = null, podium = [] }) => {
+const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_role = 'PUBLIC', voter_ip = null, vote_hash = null, voted_at = null, podium = [], voter_documento = null, voter_nombre = null }) => {
     // INSERT ON CONFLICT elimina la race condition del SELECT+INSERT.
     // Requiere: UNIQUE(qr_vote_id, voter_token) en public_votes.
     const votedAtValue = voted_at ? new Date(voted_at) : new Date();
@@ -84,11 +84,11 @@ const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_role = 
         await client.query('BEGIN');
 
         const result = await client.query(
-            `INSERT INTO public_votes (qr_vote_id, project_id, voter_token, voter_role, voter_ip, vote_hash, voted_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `INSERT INTO public_votes (qr_vote_id, project_id, voter_token, voter_role, voter_ip, vote_hash, voted_at, voter_documento, voter_nombre)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              ON CONFLICT (qr_vote_id, voter_token) DO NOTHING
              RETURNING *`,
-            [qr_vote_id, project_id, voter_token, voter_role, voter_ip, vote_hash, votedAtValue]
+            [qr_vote_id, project_id, voter_token, voter_role, voter_ip, vote_hash, votedAtValue, voter_documento ?? null, voter_nombre ?? null]
         );
 
         // Si DO NOTHING disparó, el token ya había votado
@@ -137,6 +137,7 @@ const getVoteById = async (voteId) => {
     const result = await pool.query(
         `SELECT pv.id_vote, pv.qr_vote_id, pv.project_id, pv.voter_token,
                 pv.voter_role, pv.voter_ip, pv.vote_hash, pv.voted_at,
+                pv.voter_documento, pv.voter_nombre,
                 p.name AS project_name
          FROM public_votes pv
                   LEFT JOIN projects p ON p.id_project = pv.project_id
@@ -150,6 +151,7 @@ const getVotesByEvent = async (eventId) => {
     const result = await pool.query(
         `SELECT pv.id_vote, pv.qr_vote_id, pv.project_id, pv.voter_token,
                 pv.voter_role, pv.voter_ip, pv.vote_hash, pv.voted_at,
+                pv.voter_documento, pv.voter_nombre,
                 p.name AS project_name
          FROM public_votes pv
                   JOIN qr_votes qr ON qr.id = pv.qr_vote_id

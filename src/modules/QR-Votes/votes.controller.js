@@ -92,7 +92,7 @@ const getProjectsForStaffVoting = async (req, res) => {
 // Body: { qr_vote_id, project_id, voter_token, podium: [{project_id, position}] }
 const registerVote = async (req, res) => {
     try {
-        const { qr_vote_id, project_id, voter_token, podium } = req.body;
+        const { qr_vote_id, project_id, voter_token, podium, voter_documento, voter_nombre } = req.body;
 
         if (!qr_vote_id || !voter_token)
             return res.status(400).json({ error: 'qr_vote_id y voter_token son requeridos' });
@@ -104,7 +104,7 @@ const registerVote = async (req, res) => {
         const voter_ip = getClientIp(req);
         // project_id principal = 1er lugar del podio
         const primaryId = project_id ?? podium.find(p => p.position === 1)?.project_id;
-        const vote = await service.registerVote({ qr_vote_id, project_id: primaryId, voter_token, voter_ip, podium });
+        const vote = await service.registerVote({ qr_vote_id, project_id: primaryId, voter_token, voter_ip, podium, voter_documento: voter_documento ?? null, voter_nombre: voter_nombre ?? null });
 
         const io = getIO();
         if (io) _debouncedEmit(io, `votes_event_${qr_vote_id}`, 'vote:new', { qr_vote_id, project_id: primaryId });

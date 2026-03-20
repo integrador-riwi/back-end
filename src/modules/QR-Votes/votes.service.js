@@ -104,7 +104,7 @@ const getProjectsForStaffVoting = async (staff_token) => {
 };
 
 // ── Registrar voto (público o staff) ─────────────────────────────────────────
-const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_ip = null, podium = [] }) => {
+const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_ip = null, podium = [], voter_documento = null, voter_nombre = null }) => {
     const qr = await repo.getQrById(qr_vote_id);
 
     if (!qr || !qr.active)
@@ -137,7 +137,7 @@ const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_ip = nu
     // Firma criptográfica del voto
     const vote_hash = generateVoteHash({ qr_vote_id, project_id: primaryProjectId, voter_token, voted_at });
 
-    return repo.registerVote({ qr_vote_id, project_id: primaryProjectId, voter_token, voter_role, voter_ip, vote_hash, voted_at, podium });
+    return repo.registerVote({ qr_vote_id, project_id: primaryProjectId, voter_token, voter_role, voter_ip, vote_hash, voted_at, podium, voter_documento, voter_nombre });
 };
 
 const getResults = async (id_event) => {
@@ -187,13 +187,15 @@ function _buildAuditResult(vote) {
     const status = !vote.vote_hash ? 'NO_HASH' : isValid ? 'VALID' : 'INVALID';
 
     return {
-        id_vote:      vote.id_vote,
-        project_id:   vote.project_id,
-        project_name: vote.project_name ?? null,
-        qr_vote_id:   vote.qr_vote_id,
-        voter_role:   vote.voter_role,
-        voter_ip:     vote.voter_ip,
-        voted_at:     vote.voted_at,
+        id_vote:         vote.id_vote,
+        project_id:      vote.project_id,
+        project_name:    vote.project_name ?? null,
+        qr_vote_id:      vote.qr_vote_id,
+        voter_role:      vote.voter_role,
+        voter_ip:        vote.voter_ip,
+        voter_documento: vote.voter_documento ?? null,
+        voter_nombre:    vote.voter_nombre ?? null,
+        voted_at:        vote.voted_at,
         status,
     };
 }
