@@ -153,7 +153,6 @@ const auditVote = async (req, res) => {
     }
 };
 
-
 export {
     createQrVote,
     getQrsByEvent,

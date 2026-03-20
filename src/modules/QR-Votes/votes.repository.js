@@ -94,7 +94,6 @@ const registerVote = async ({ qr_vote_id, project_id, voter_token, voter_role = 
     return result.rows[0];
 };
 
-
 const getVoteById = async (voteId) => {
     const result = await pool.query(
         `SELECT pv.id_vote, pv.qr_vote_id, pv.project_id, pv.voter_token,
@@ -188,7 +187,6 @@ export {
     getQrsByEvent,
     findExistingVote,
     registerVote,
-    getVotesByEvent,
     getVoteById,
     getVotesByEvent,
     getProjectsByEvent,

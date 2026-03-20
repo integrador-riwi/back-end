@@ -29,9 +29,6 @@ router.get('/event/:eventId/audit', authenticate, hasRole('ADMIN'), controller.a
 // Auditar un voto específico (verificar firma HMAC)
 router.get('/audit/:voteId', authenticate, hasRole('ADMIN'), controller.auditVote);
 
-// Auditar todos los votos de un evento
-router.get('/event/:eventId/audit', authenticate, hasRole('ADMIN'), controller.auditVotesByEvent);
-
 // ─── Rutas Públicas (sin JWT, accesibles desde el QR del público) ─────────────
 
 // Obtener proyectos para votar (sesión pública)
