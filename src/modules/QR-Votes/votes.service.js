@@ -136,47 +136,6 @@ const deleteVotesByEvent = async (id_event) => {
     return { deleted_count: deleted };
 };
 
-// ── Auditoría: verificar todos los votos de un evento ────────────────────────
-const auditVotesByEvent = async (eventId) => {
-    const votes = await repo.getVotesByEvent(eventId);
-
-    const audited = votes.map((vote) => {
-        const isValid = verifyVoteHash({
-            qr_vote_id: vote.qr_vote_id,
-            project_id: vote.project_id,
-            voter_token: vote.voter_token,
-            voted_at:   vote.voted_at instanceof Date
-                ? vote.voted_at.toISOString()
-                : vote.voted_at,
-            vote_hash:  vote.vote_hash,
-        });
-
-        return {
-            id_vote:      vote.id_vote,
-            project_name: vote.project_name,
-            team_name:    vote.team_name,
-            voter_role:   vote.voter_role,
-            voter_ip:     vote.voter_ip,
-            voted_at:     vote.voted_at,
-            vote_type:    vote.vote_type,
-            has_hash:     !!vote.vote_hash,
-            is_valid:     isValid,
-            verdict: !vote.vote_hash
-                ? 'NO_HASH'
-                : isValid ? 'VALID' : 'INVALID',
-        };
-    });
-
-    const summary = {
-        total:    audited.length,
-        valid:    audited.filter(v => v.verdict === 'VALID').length,
-        no_hash:  audited.filter(v => v.verdict === 'NO_HASH').length,
-        invalid:  audited.filter(v => v.verdict === 'INVALID').length,
-    };
-
-    return { summary, votes: audited };
-};
-
 // ── Auditoría: verificar un voto individual ──────────────────────────────────
 const auditVote = async (voteId) => {
     const vote = await repo.getVoteById(voteId);
