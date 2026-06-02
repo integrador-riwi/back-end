@@ -51,6 +51,10 @@ router.delete(
 
 router.delete("/:id/leave", authenticate, TeamsController.leaveTeam);
 
+router.post("/:id/repos", authenticate, TeamsController.createAdditionalRepo);
+router.get("/:id/repos", authenticate, TeamsController.listAllRepos);
+router.delete("/:id/repos/:repoId", authenticate, TeamsController.deleteAdditionalRepo);
+
 router.post(
   "/invitations/:id/accept",
   authenticate,
