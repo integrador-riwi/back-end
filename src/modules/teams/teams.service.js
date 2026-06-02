@@ -896,6 +896,33 @@ export const deleteAdditionalRepo = async (teamId, repoId, userId, userRole) => 
   const deleted = await TeamsRepository.deleteAdditionalRepo(repoId, teamId);
   if (!deleted) throw new NotFoundError("Repo adicional no encontrado");
 
+  try {
+    const leaderWithGithub = await TeamsRepository.getLeaderWithGithub(teamId);
+    const allMembers = await TeamsRepository.getTeamMembersWithGithub(teamId);
+    const githubOrg = await TeamsRepository.getTeamGithubOrg(teamId);
+
+    if (leaderWithGithub) {
+      for (const member of allMembers) {
+        if (!member.github_username) continue;
+        await n8nService.triggerMemberRemoved(
+          {
+            repoName: deleted.repo_name,
+            leaderGithubUsername: leaderWithGithub.github_username,
+            leaderToken: leaderWithGithub.github_token,
+            githubOrg,
+          },
+          {
+            githubUsername: member.github_username,
+            email: member.email,
+            name: member.name,
+          },
+        );
+      }
+    }
+  } catch (error) {
+    console.error("[n8n] revoke members on repo delete error:", error.message);
+  }
+
   return deleted;
 };
 
