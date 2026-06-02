@@ -391,19 +391,22 @@ export const removeMemberFromTeam = async (
 
     if (memberWithGithub && leaderWithGithub && teamProject) {
       const githubOrgRemove = await TeamsRepository.getTeamGithubOrg(teamId);
-      await n8nService.triggerMemberRemoved(
-        {
-          repoName: teamProject.repo_name,
-          leaderGithubUsername: leaderWithGithub.github_username,
-          leaderToken: leaderWithGithub.github_token,
-          githubOrg: githubOrgRemove,
-        },
-        {
-          githubUsername: memberWithGithub.github_username,
-          email: memberWithGithub.email,
-          name: memberWithGithub.name,
-        },
-      );
+      const allRepoNames = await TeamsRepository.getAllTeamRepoNames(teamId);
+      for (const repoName of allRepoNames) {
+        await n8nService.triggerMemberRemoved(
+          {
+            repoName,
+            leaderGithubUsername: leaderWithGithub.github_username,
+            leaderToken: leaderWithGithub.github_token,
+            githubOrg: githubOrgRemove,
+          },
+          {
+            githubUsername: memberWithGithub.github_username,
+            email: memberWithGithub.email,
+            name: memberWithGithub.name,
+          },
+        );
+      }
     }
   } catch (error) {
     console.error("Error triggering n8n member removed:", error.message);
@@ -536,23 +539,26 @@ export const acceptInvitation = async (invitationId, userId) => {
 
     if (leaderWithGithub && teamProject?.repo_name) {
       const githubOrg2 = await TeamsRepository.getTeamGithubOrg(teamId);
-      await n8nService.triggerMemberInvited(
-        {
-          id: teamId,
-          projectId: teamId,
-          repoName: teamProject.repo_name,
-          leaderGithubUsername: leaderWithGithub.github_username,
-          leaderToken: leaderWithGithub.github_token,
-          githubOrg: githubOrg2,
-        },
-        {
-          githubUsername: memberWithGithub.github_username,
-          githubToken: memberWithGithub.github_token,
-          email: memberWithGithub.email,
-          name: memberWithGithub.name,
-          role: "DEVELOPER",
-        },
-      );
+      const allRepoNames = await TeamsRepository.getAllTeamRepoNames(teamId);
+      for (const repoName of allRepoNames) {
+        await n8nService.triggerMemberInvited(
+          {
+            id: teamId,
+            projectId: teamId,
+            repoName,
+            leaderGithubUsername: leaderWithGithub.github_username,
+            leaderToken: leaderWithGithub.github_token,
+            githubOrg: githubOrg2,
+          },
+          {
+            githubUsername: memberWithGithub.github_username,
+            githubToken: memberWithGithub.github_token,
+            email: memberWithGithub.email,
+            name: memberWithGithub.name,
+            role: "DEVELOPER",
+          },
+        );
+      }
     }
   } catch (error) {
     console.error("Error triggering n8n on accept invitation:", error.message);
@@ -704,23 +710,26 @@ export const acceptJoinRequest = async (requestId, userId, userRole) => {
       teamProject?.repo_name
     ) {
       const githubOrg3 = await TeamsRepository.getTeamGithubOrg(teamId);
-      await n8nService.triggerMemberInvited(
-        {
-          id: teamId,
-          projectId: teamId,
-          repoName: teamProject.repo_name,
-          leaderGithubUsername: leaderWithGithub.github_username,
-          leaderToken: leaderWithGithub.github_token,
-          githubOrg: githubOrg3,
-        },
-        {
-          githubUsername: memberWithGithub.github_username,
-          githubToken: memberWithGithub.github_token,
-          email: memberWithGithub.email,
-          name: memberWithGithub.name,
-          role: "DEVELOPER",
-        },
-      );
+      const allRepoNames = await TeamsRepository.getAllTeamRepoNames(teamId);
+      for (const repoName of allRepoNames) {
+        await n8nService.triggerMemberInvited(
+          {
+            id: teamId,
+            projectId: teamId,
+            repoName,
+            leaderGithubUsername: leaderWithGithub.github_username,
+            leaderToken: leaderWithGithub.github_token,
+            githubOrg: githubOrg3,
+          },
+          {
+            githubUsername: memberWithGithub.github_username,
+            githubToken: memberWithGithub.github_token,
+            email: memberWithGithub.email,
+            name: memberWithGithub.name,
+            role: "DEVELOPER",
+          },
+        );
+      }
     }
   } catch (error) {
     console.error("Error triggering n8n on acceptJoinRequest:", error.message);
