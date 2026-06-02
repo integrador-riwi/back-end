@@ -387,9 +387,8 @@ export const removeMemberFromTeam = async (
 
   try {
     const leaderWithGithub = await TeamsRepository.getLeaderWithGithub(teamId);
-    const teamProject = await TeamsRepository.getTeamProject(teamId);
 
-    if (memberWithGithub && leaderWithGithub && teamProject) {
+    if (memberWithGithub && leaderWithGithub) {
       const githubOrgRemove = await TeamsRepository.getTeamGithubOrg(teamId);
       const allRepoNames = await TeamsRepository.getAllTeamRepoNames(teamId);
       for (const repoName of allRepoNames) {
@@ -535,9 +534,8 @@ export const acceptInvitation = async (invitationId, userId) => {
   try {
     const teamId = invitation.id_team;
     const leaderWithGithub = await TeamsRepository.getLeaderWithGithub(teamId);
-    const teamProject = await TeamsRepository.getTeamProject(teamId);
 
-    if (leaderWithGithub && teamProject?.repo_name) {
+    if (leaderWithGithub) {
       const githubOrg2 = await TeamsRepository.getTeamGithubOrg(teamId);
       const allRepoNames = await TeamsRepository.getAllTeamRepoNames(teamId);
       for (const repoName of allRepoNames) {
@@ -702,13 +700,8 @@ export const acceptJoinRequest = async (requestId, userId, userRole) => {
       request.id_user,
     );
     const leaderWithGithub = await TeamsRepository.getLeaderWithGithub(teamId);
-    const teamProject = await TeamsRepository.getTeamProject(teamId);
 
-    if (
-      memberWithGithub?.github_username &&
-      leaderWithGithub &&
-      teamProject?.repo_name
-    ) {
+    if (memberWithGithub?.github_username && leaderWithGithub) {
       const githubOrg3 = await TeamsRepository.getTeamGithubOrg(teamId);
       const allRepoNames = await TeamsRepository.getAllTeamRepoNames(teamId);
       for (const repoName of allRepoNames) {
