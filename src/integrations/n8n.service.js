@@ -103,18 +103,18 @@ const n8nService = {
       return null;
     }
 
-    const response = await axios.post(`${config.n8n.webhookUrl}/secondary-repo`, {
+    const response = await axios.post(`${config.n8n.webhookUrl}/secondary-repo-created`, {
+      projectId: teamData.projectId ?? teamData.teamId,
       teamId: teamData.teamId,
-      repoName: teamData.repoName,
-      label: teamData.label ?? null,
-      leaderUsername: leader.githubUsername,
-      leaderToken: leader.githubToken,
+      repoSuffix: teamData.label ?? null,
+      collaboratorUsername: leader.githubUsername,
+      collaboratorToken: leader.githubToken,
       githubOrg: teamData.githubOrg ?? null,
     });
 
-    console.log("[n8n] secondary-repo payload enviado:", {
+    console.log("[n8n] secondary-repo-created payload enviado:", {
       teamId: teamData.teamId,
-      repoName: teamData.repoName,
+      repoSuffix: teamData.label,
     });
 
     return response.data;

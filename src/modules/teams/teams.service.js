@@ -810,7 +810,7 @@ export const createAdditionalRepo = async (teamId, data, userId, userRole) => {
 
   try {
     const n8nResponse = await n8nService.triggerSecondaryRepo(
-      { teamId, repoName, label, githubOrg },
+      { teamId, projectId: team.id_project ?? null, repoName, label, githubOrg },
       {
         githubUsername: leaderWithGithub.github_username,
         githubToken: githubOrgToken ?? leaderWithGithub.github_token,
