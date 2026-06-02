@@ -292,6 +292,34 @@ export const searchProjects = asyncHandler(async (req, res) => {
   });
 });
 
+export const createAdditionalRepo = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { label } = req.body;
+  const userId = req.user.id_user;
+  const userRole = req.user.role;
+
+  const repo = await TeamsService.createAdditionalRepo(id, { label }, userId, userRole);
+  return created(res, repo);
+});
+
+export const listAllRepos = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id_user;
+  const userRole = req.user.role;
+
+  const repos = await TeamsService.listAllRepos(id, userId, userRole);
+  return success(res, repos);
+});
+
+export const deleteAdditionalRepo = asyncHandler(async (req, res) => {
+  const { id, repoId } = req.params;
+  const userId = req.user.id_user;
+  const userRole = req.user.role;
+
+  const deleted = await TeamsService.deleteAdditionalRepo(id, repoId, userId, userRole);
+  return success(res, deleted);
+});
+
 export default {
   create,
   list,
@@ -316,4 +344,7 @@ export default {
   rejectJoinRequest,
   cancelJoinRequest,
   searchProjects,
+  createAdditionalRepo,
+  listAllRepos,
+  deleteAdditionalRepo,
 };
