@@ -500,6 +500,23 @@ export const getLeaderWithGithub = async (teamId) => {
   return result.rows[0] || null;
 };
 
+export const getTeamMembersWithGithub = async (teamId) => {
+  const query = `
+    SELECT
+      u.id_user,
+      u.name,
+      u.email,
+      u.github_username,
+      u.github_token,
+      tc.team_role
+    FROM team_coders tc
+           JOIN users u ON tc.id_user = u.id_user
+    WHERE tc.id_team = $1
+  `;
+  const result = await pool.query(query, [teamId]);
+  return result.rows;
+};
+
 export const getMemberWithGithub = async (userId) => {
   const query = `
     SELECT
@@ -1137,6 +1154,7 @@ export default {
   rejectInvitation,
   getLeaderWithGithub,
   getMemberWithGithub,
+  getTeamMembersWithGithub,
   countTeamMembers,
   getTeamProject,
   saveTeamProject,

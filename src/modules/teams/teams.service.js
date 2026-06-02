@@ -831,6 +831,35 @@ export const createAdditionalRepo = async (teamId, data, userId, userRole) => {
     label,
   });
 
+  // Sync existing members to the new repo
+  try {
+    const allMembers = await TeamsRepository.getTeamMembersWithGithub(teamId);
+    const nonLeaders = allMembers.filter(
+      (m) => m.team_role !== "LEADER" && m.github_username && m.github_token,
+    );
+    for (const member of nonLeaders) {
+      await n8nService.triggerMemberInvited(
+        {
+          id: teamId,
+          projectId: teamId,
+          repoName: savedRepoName,
+          leaderGithubUsername: leaderWithGithub.github_username,
+          leaderToken: leaderWithGithub.github_token,
+          githubOrg,
+        },
+        {
+          githubUsername: member.github_username,
+          githubToken: member.github_token,
+          email: member.email,
+          name: member.name,
+          role: "DEVELOPER",
+        },
+      );
+    }
+  } catch (error) {
+    console.error("[n8n] sync existing members to new repo error:", error.message);
+  }
+
   return repo;
 };
 
