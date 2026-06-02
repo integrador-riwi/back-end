@@ -573,6 +573,54 @@ export const saveTeamProject = async (
   return result.rows[0];
 };
 
+export const createAdditionalRepo = async (teamId, { repoName, repoUrl, label }) => {
+  const query = `
+    INSERT INTO team_additional_repos (id_team, repo_name, repo_url, label)
+    VALUES ($1, $2, $3, $4)
+    RETURNING id_repo, id_team, repo_name, repo_url, label, created_at
+  `;
+  const result = await pool.query(query, [teamId, repoName, repoUrl ?? null, label ?? null]);
+  return result.rows[0];
+};
+
+export const getAdditionalRepos = async (teamId) => {
+  const query = `
+    SELECT id_repo, id_team, repo_name, repo_url, label, created_at
+    FROM team_additional_repos
+    WHERE id_team = $1
+    ORDER BY created_at ASC
+  `;
+  const result = await pool.query(query, [teamId]);
+  return result.rows;
+};
+
+export const deleteAdditionalRepo = async (repoId, teamId) => {
+  const query = `
+    DELETE FROM team_additional_repos
+    WHERE id_repo = $1 AND id_team = $2
+    RETURNING id_repo, repo_name
+  `;
+  const result = await pool.query(query, [repoId, teamId]);
+  return result.rows[0] || null;
+};
+
+export const getAllTeamRepoNames = async (teamId) => {
+  const primaryQuery = `
+    SELECT repo_name FROM team_projects WHERE id_team = $1
+  `;
+  const additionalQuery = `
+    SELECT repo_name FROM team_additional_repos WHERE id_team = $1
+  `;
+  const [primary, additional] = await Promise.all([
+    pool.query(primaryQuery, [teamId]),
+    pool.query(additionalQuery, [teamId]),
+  ]);
+  const repos = [];
+  if (primary.rows[0]?.repo_name) repos.push(primary.rows[0].repo_name);
+  repos.push(...additional.rows.map((r) => r.repo_name));
+  return repos;
+};
+
 export const createInvitation = async (teamId, userId, invitedBy) => {
   const client = await pool.connect();
 
@@ -1103,4 +1151,8 @@ export default {
   rejectJoinRequest,
   isInAnyTeam,
   cancelJoinRequest,
+  createAdditionalRepo,
+  getAdditionalRepos,
+  deleteAdditionalRepo,
+  getAllTeamRepoNames,
 };
