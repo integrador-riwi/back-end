@@ -787,6 +787,9 @@ export const createAdditionalRepo = async (teamId, data, userId, userRole) => {
   }
 
   const label = data.label?.trim() || null;
+  if (label && label.length > 50) {
+    throw new ValidationError("El label no puede exceder 50 caracteres");
+  }
   const repoName = `project-${teamId}-${label ? label.toLowerCase().replace(/\s+/g, "-") : Date.now()}`;
 
   let githubOrg = null;
