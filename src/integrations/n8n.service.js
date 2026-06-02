@@ -15,6 +15,7 @@ const n8nService = {
       collaboratorUsername: collaborator.githubUsername,
       collaboratorToken: collaborator.githubToken,
       githubOrg: projectData.githubOrg ?? null,
+      private: false,
     });
     console.log("[n8n] Payload enviado:", {
       projectId: projectData.id,
