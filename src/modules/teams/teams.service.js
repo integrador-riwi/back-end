@@ -772,6 +772,99 @@ export const rejectJoinRequest = async (requestId, userId, userRole) => {
   return result;
 };
 
+export const createAdditionalRepo = async (teamId, data, userId, userRole) => {
+  const team = await TeamsRepository.findById(teamId);
+  if (!team) throw new NotFoundError("Equipo no encontrado");
+
+  const isLeader = await TeamsRepository.isLeader(teamId, userId);
+  if (!isLeader && userRole !== "ADMIN") {
+    throw new ForbiddenError("Solo el líder puede agregar repos adicionales");
+  }
+
+  const leaderWithGithub = await TeamsRepository.getMemberWithGithub(userId);
+  if (!leaderWithGithub?.github_username) {
+    throw new ValidationError("Debes tener GitHub conectado");
+  }
+
+  const label = data.label?.trim() || null;
+  const repoName = `project-${teamId}-${label ? label.toLowerCase().replace(/\s+/g, "-") : Date.now()}`;
+
+  let githubOrg = null;
+  let githubOrgToken = null;
+  if (team.id_event) {
+    try {
+      const { findById: findEvent } = await import("../events/events.repository.js");
+      const event = await findEvent(team.id_event);
+      githubOrg = event?.github_org ?? null;
+      githubOrgToken = event?.github_org_token ?? null;
+    } catch (_) {}
+  }
+
+  let repoUrl = null;
+  let savedRepoName = repoName;
+
+  try {
+    const n8nResponse = await n8nService.triggerSecondaryRepo(
+      { teamId, repoName, label, githubOrg },
+      {
+        githubUsername: leaderWithGithub.github_username,
+        githubToken: githubOrgToken ?? leaderWithGithub.github_token,
+      },
+    );
+    const n8nData = n8nResponse?.data?.data ?? n8nResponse?.data ?? null;
+    if (n8nData) {
+      repoUrl = n8nData.repositoryUrl || n8nData.repository_url || null;
+      savedRepoName = n8nData.repositoryName || repoName;
+    }
+  } catch (error) {
+    console.error("[n8n] secondary-repo error:", error.message);
+  }
+
+  const repo = await TeamsRepository.createAdditionalRepo(teamId, {
+    repoName: savedRepoName,
+    repoUrl,
+    label,
+  });
+
+  return repo;
+};
+
+export const listAllRepos = async (teamId, userId, userRole) => {
+  const team = await TeamsRepository.findById(teamId);
+  if (!team) throw new NotFoundError("Equipo no encontrado");
+
+  const isMember = await TeamsRepository.isMember(teamId, userId);
+  const isAdmin = userRole === "ADMIN";
+  const isTL = ["TL_DEVELOPMENT", "TL_SOFT_SKILLS", "TL_ENGLISH"].includes(userRole);
+
+  if (!isMember && !isAdmin && !isTL) {
+    throw new ForbiddenError("No tienes acceso a este equipo");
+  }
+
+  const primary = await TeamsRepository.getTeamProject(teamId);
+  const additional = await TeamsRepository.getAdditionalRepos(teamId);
+
+  return {
+    primary: primary || null,
+    additional,
+  };
+};
+
+export const deleteAdditionalRepo = async (teamId, repoId, userId, userRole) => {
+  const team = await TeamsRepository.findById(teamId);
+  if (!team) throw new NotFoundError("Equipo no encontrado");
+
+  const isLeader = await TeamsRepository.isLeader(teamId, userId);
+  if (!isLeader && userRole !== "ADMIN") {
+    throw new ForbiddenError("Solo el líder puede eliminar repos adicionales");
+  }
+
+  const deleted = await TeamsRepository.deleteAdditionalRepo(repoId, teamId);
+  if (!deleted) throw new NotFoundError("Repo adicional no encontrado");
+
+  return deleted;
+};
+
 export default {
   createTeam,
   listTeams,
@@ -794,4 +887,7 @@ export default {
   acceptJoinRequest,
   rejectJoinRequest,
   cancelJoinRequest,
+  createAdditionalRepo,
+  listAllRepos,
+  deleteAdditionalRepo,
 };
