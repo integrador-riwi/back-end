@@ -4,6 +4,16 @@ node_modules/
 
 # Env files
 .env
+coders.xlsx
+check_coders.js
+existing_coders_report.json
+existing_coders_email_report.json
+update_coders.js
+missing_coders_report.js
+missing_coders_report.json
+register_coders.js
+verify_all_coders.js
+verify_report.json
 
 # Logs
 logs/
