@@ -52,7 +52,11 @@ export const config = {
     webhookSecret: process.env.GITHUB_WEBHOOK_SECRET || '',
     clientId: process.env.GITHUB_CLIENT_ID || '',
     clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
-    redirectUri: process.env.GITHUB_REDIRECT_URI || 'http://localhost:3010/api/auth/github/callback'
+    redirectUri: process.env.GITHUB_REDIRECT_URI || 'http://localhost:3010/api/auth/github/callback',
+    backendUrl: process.env.BACKEND_URL ||
+      (process.env.GITHUB_REDIRECT_URI
+        ? new URL(process.env.GITHUB_REDIRECT_URI).origin
+        : 'http://localhost:3010'),
   },
 
   moodle: {

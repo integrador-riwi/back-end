@@ -9,7 +9,7 @@ export const getAuthorizationUrl = (state = null) => {
   const params = new URLSearchParams({
     client_id: config.github.clientId,
     redirect_uri: config.github.redirectUri,
-    scope: "public_repo user:email read:org write:org",
+    scope: "public_repo user:email read:org write:org admin:org_hook",
     response_type: "code",
   });
 
@@ -196,6 +196,37 @@ export const calculateTokenExpiration = (expiresInSeconds) => {
   return expiresAt;
 };
 
+export const registerOrgWebhook = async (org, token) => {
+  const webhookUrl = `${config.github.backendUrl}/api/webhooks/github`;
+  const secret = config.github.webhookSecret;
+
+  try {
+    const { data: hooks } = await axios.get(
+      `${GITHUB_API_BASE}/orgs/${org}/hooks`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" } },
+    );
+
+    const already = hooks.some((h) => h.config?.url === webhookUrl);
+    if (already) return { skipped: true };
+
+    await axios.post(
+      `${GITHUB_API_BASE}/orgs/${org}/hooks`,
+      {
+        name: "web",
+        active: true,
+        events: ["member", "organization", "repository"],
+        config: { url: webhookUrl, content_type: "json", secret, insecure_ssl: "0" },
+      },
+      { headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" } },
+    );
+
+    return { registered: true };
+  } catch (err) {
+    console.warn(`[GitHub] Could not register org webhook for ${org}:`, err.response?.data?.message ?? err.message);
+    return { error: true };
+  }
+};
+
 export default {
   getAuthorizationUrl,
   exchangeCodeForToken,
@@ -206,4 +237,5 @@ export default {
   revokeToken,
   calculateTokenExpiration,
   getUserOrgs,
+  registerOrgWebhook,
 };

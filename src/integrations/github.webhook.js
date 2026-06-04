@@ -108,11 +108,35 @@ router.post(
   verifySignature,
   async (req, res) => {
     const event = req.headers["x-github-event"];
-    const { action, member, membership, repository } = req.body;
+    const { action, member, membership, repository, changes } = req.body;
 
     console.log(`[GitHub Webhook] event=${event} action=${action}`);
 
     res.status(200).json({ received: true });
+
+    if (event === "repository" && action === "renamed") {
+      const newName = repository?.name;
+      const oldName = changes?.repository?.name?.from;
+      const newUrl = repository?.html_url ?? null;
+      if (!newName || !oldName) return;
+
+      console.log(`[GitHub Webhook] Repo renamed: ${oldName} -> ${newName}`);
+
+      try {
+        await pool.query(
+          "UPDATE team_projects SET repo_name = $1, repo_url = COALESCE($2, repo_url) WHERE repo_name = $3",
+          [newName, newUrl, oldName],
+        );
+        await pool.query(
+          "UPDATE team_additional_repos SET repo_name = $1, repo_url = COALESCE($2, repo_url) WHERE repo_name = $3",
+          [newName, newUrl, oldName],
+        );
+        console.log(`[GitHub Webhook] DB updated for renamed repo ${oldName} -> ${newName}`);
+      } catch (error) {
+        console.error("[GitHub Webhook] Error updating renamed repo in DB:", error.message);
+      }
+      return;
+    }
 
     if (event === "organization" && action === "member_removed") {
       const githubUsername = member?.login;

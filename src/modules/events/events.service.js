@@ -1,5 +1,6 @@
 import * as EventsRepository from "./events.repository.js";
 import { getMemberWithGithub } from "../teams/teams.repository.js";
+import { registerOrgWebhook } from "../../integrations/github.service.js";
 import {
   NotFoundError,
   ValidationError,
@@ -76,7 +77,14 @@ export const createEvent = async (eventData, creatorUser) => {
     createdBy: creatorUser.id_user,
   });
 
-  // 2. Create rubrics if any were provided
+  // 2. Register GitHub org webhook (fire-and-forget, non-blocking)
+  if (eventData.githubOrg && creatorWithGithub?.github_token) {
+    registerOrgWebhook(eventData.githubOrg, creatorWithGithub.github_token)
+      .then((r) => console.log(`[GitHub] Webhook for org ${eventData.githubOrg}:`, r))
+      .catch(() => {});
+  }
+
+  // 3. Create rubrics if any were provided
   let savedRubrics = [];
   if (rubrics.length > 0) {
     savedRubrics = await EventsRepository.createRubricsWithGrades(
@@ -106,7 +114,7 @@ export const updateEvent = async (id, eventData, requestingUser) => {
       ? _resolveTargetClans(eventData.targetClans)
       : undefined; // undefined = don't touch the column
 
-  return EventsRepository.update(id, {
+  const updated = await EventsRepository.update(id, {
     title: eventData.title,
     description: eventData.description,
     eventDate: eventData.eventDate,
@@ -119,6 +127,19 @@ export const updateEvent = async (id, eventData, requestingUser) => {
     maxTeamSize: eventData.maxTeamSize ?? null,
     targetClans,
   });
+
+  // Register webhook if githubOrg was added or changed
+  const orgChanged = eventData.githubOrg && eventData.githubOrg !== existingEvent.github_org;
+  if (orgChanged) {
+    const updaterGithub = await getMemberWithGithub(requestingUser.id_user);
+    if (updaterGithub?.github_token) {
+      registerOrgWebhook(eventData.githubOrg, updaterGithub.github_token)
+        .then((r) => console.log(`[GitHub] Webhook for org ${eventData.githubOrg}:`, r))
+        .catch(() => {});
+    }
+  }
+
+  return updated;
 };
 
 export const deleteEvent = async (id, requestingUser) => {
