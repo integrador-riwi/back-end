@@ -1,27 +1,55 @@
-import { Resend } from 'resend';
+import { google } from 'googleapis';
 
-// Initialize Resend with the API key from environment variables
-const resend = new Resend(process.env.RESEND_API_KEY);
+const OAuth2 = google.auth.OAuth2;
 
-export const sendEmail = async ({ toEmail, toName, subject, html }) => {
-    // Determine the sender address. If using Resend without a verified domain, 
-    // it MUST be onboarding@resend.dev (for testing). 
-    // In production with a verified domain, it should be your actual EMAIL_FROM.
-    const fromAddress = process.env.EMAIL_FROM || 'onboarding@resend.dev';
-    
-    // Resend requires the 'to' address. If using the testing domain (onboarding@resend.dev),
-    // you can ONLY send emails to the email address associated with your Resend account.
-    const { data, error } = await resend.emails.send({
-        from: `TeamUp <${fromAddress}>`,
-        to: [toEmail],
-        subject: subject,
-        html: html,
+const createTransporter = async () => {
+    const oauth2Client = new OAuth2(
+        process.env.GMAIL_CLIENT_ID,
+        process.env.GMAIL_CLIENT_SECRET,
+        "https://developers.google.com/oauthplayground"
+    );
+
+    oauth2Client.setCredentials({
+        refresh_token: process.env.GMAIL_REFRESH_TOKEN
     });
 
-    if (error) {
-        console.error('Error enviando correo con Resend:', error);
-        throw new Error(error.message);
-    }
+    return google.gmail({ version: 'v1', auth: oauth2Client });
+};
+
+// Convierte un string a Base64URL
+const makeBody = (to, from, subject, message) => {
+    const str = [
+        `To: ${to}`,
+        `From: TeamUp <${from}>`,
+        `Subject: =?utf-8?B?${Buffer.from(subject).toString('base64')}?=`,
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=utf-8',
+        '',
+        message,
+    ].join('\n');
+
+    return Buffer.from(str).toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+};
+
+export const sendEmail = async ({ toEmail, toName, subject, html }) => {
+    const gmail = await createTransporter();
+    
+    const rawMessage = makeBody(
+        toEmail, 
+        process.env.EMAIL_USER, 
+        subject, 
+        html
+    );
+
+    const { data } = await gmail.users.messages.send({
+        userId: 'me',
+        requestBody: {
+            raw: rawMessage,
+        },
+    });
 
     return data;
 };
@@ -59,7 +87,6 @@ export const sendBulkEmails = async (users) => {
             results.push({ email: user.email, success: false, error: err.message });
         }
 
-        // Resend API rate limits are generally higher, but keeping a small delay is safe
         await new Promise(resolve => setTimeout(resolve, 300));
     }
 
