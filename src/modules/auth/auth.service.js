@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import AuthRepository from "./auth.repository.js";
-import PasswordResetRepository from "./password-reset.repository.js";
+import * as PasswordResetRepository from "./password-reset.repository.js";
 import {
   generateToken,
   generateRefreshToken,
