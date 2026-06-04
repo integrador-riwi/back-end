@@ -149,6 +149,43 @@ export const getPublicProfile = async (req, res, next) => {
   }
 };
 
+import { sendWelcomeEmails } from '../../utils/emails/email.service.js';
+import * as UsersRepository from './users.repository.js'; // Needed to fetch users directly if not using service
+
+export const sendWelcomeEmailsController = async (req, res, next) => {
+  try {
+    const { userIds, clan } = req.body;
+    let users = [];
+
+    if (userIds && Array.isArray(userIds) && userIds.length > 0) {
+      // Assuming usersService or repo can fetch multiple users. But we only need email and name.
+      // We will loop or do a query. For simplicity, we can fetch all and filter.
+      const allUsers = await usersService.listUsers({ limit: 1000 }); // Or a custom repo method
+      users = allUsers.data.filter(u => userIds.includes(u.id_user));
+    } else if (clan) {
+      const allUsers = await usersService.listUsers({ clan, limit: 1000 });
+      users = allUsers.data;
+    } else {
+      return res.status(400).json({ status: 'error', message: 'Debe proveer userIds o clan' });
+    }
+
+    if (users.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'No se encontraron usuarios para enviar correos' });
+    }
+
+    // Call the email service
+    const results = await sendWelcomeEmails(users);
+    const successful = results.filter(r => r.success).length;
+
+    return success(res, { 
+      message: `Se enviaron ${successful} de ${users.length} correos exitosamente.`,
+      results
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default {
   list,
   get,
@@ -160,4 +197,5 @@ export default {
   getMe,
   getStats,
   getPublicProfile,
+  sendWelcomeEmailsController,
 };
