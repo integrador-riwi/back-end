@@ -14,6 +14,7 @@ missing_coders_report.json
 register_coders.js
 verify_all_coders.js
 verify_report.json
+users.test.json
 
 # Logs
 logs/

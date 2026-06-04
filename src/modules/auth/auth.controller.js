@@ -199,6 +199,19 @@ export const getGithubOrgs = asyncHandler(async (req, res) => {
   return success(res, result);
 });
 
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  // Always returns the same message — prevents user enumeration
+  const result = await AuthService.forgotPassword(email);
+  return success(res, result);
+});
+
+export const resetPassword = asyncHandler(async (req, res) => {
+  const { token, newPassword } = req.body;
+  const result = await AuthService.resetPassword(token, newPassword);
+  return success(res, result);
+});
+
 export default {
   register,
   login,
@@ -206,6 +219,8 @@ export default {
   refresh,
   getMe,
   changePassword,
+  forgotPassword,
+  resetPassword,
   updateProfile,
   githubAuth,
   githubAuthUrl,

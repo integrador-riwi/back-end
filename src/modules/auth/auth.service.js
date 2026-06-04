@@ -1,5 +1,7 @@
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import AuthRepository from "./auth.repository.js";
+import PasswordResetRepository from "./password-reset.repository.js";
 import {
   generateToken,
   generateRefreshToken,
@@ -14,6 +16,8 @@ import {
 } from "../../middleware/errorHandler.js";
 import GitHubService from "../../integrations/github.service.js";
 import config from "../../config/env.js";
+import { sendEmail } from "../../utils/emails/email.service.js";
+import { buildPasswordResetEmail } from "../../utils/emails/password-reset.template.js";
 
 const SALT_ROUNDS = 12;
 
@@ -384,6 +388,83 @@ export const getGithubOrgs = async (userId) => {
   }
 };
 
+/**
+ * FORGOT PASSWORD — Step 1
+ * Accepts an email, generates a secure one-time token, stores a hash of it,
+ * and sends the reset link. Always returns the same generic response to
+ * avoid user enumeration attacks.
+ */
+export const forgotPassword = async (email) => {
+  if (!email) {
+    throw new ValidationError("Email is required.");
+  }
+
+  // Generic response regardless of outcome (prevents user enumeration)
+  const genericResponse = {
+    message:
+      "If an account with that email exists, you will receive a reset link shortly.",
+  };
+
+  const user = await AuthRepository.findByEmail(email.toLowerCase().trim());
+  if (!user) return genericResponse; // Silently do nothing – don't reveal existence
+
+  // Generate a cryptographically secure 32-byte random token
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+  await PasswordResetRepository.saveResetToken(user.id_user, tokenHash, expiresAt);
+
+  // Build the reset URL that points to the frontend
+  const resetLink = `${config.client.url}/reset-password?token=${rawToken}`;
+
+  await sendEmail({
+    toEmail: user.email,
+    toName: user.name,
+    subject: "Restablecer contraseña – TeamUp",
+    html: buildPasswordResetEmail(user.name, resetLink),
+  });
+
+  return genericResponse;
+};
+
+/**
+ * RESET PASSWORD — Step 2
+ * Validates the raw token, hashes it, looks it up, checks expiry,
+ * updates the password, then invalidates all existing tokens.
+ */
+export const resetPassword = async (rawToken, newPassword) => {
+  if (!rawToken || !newPassword) {
+    throw new ValidationError("Token and new password are required.");
+  }
+
+  if (newPassword.length < 6) {
+    throw new ValidationError("Password must be at least 6 characters.");
+  }
+
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  const record = await PasswordResetRepository.findValidResetToken(tokenHash);
+
+  if (!record) {
+    // Same error for expired and invalid tokens to avoid timing attacks
+    throw new ValidationError(
+      "This reset link is invalid or has expired. Please request a new one."
+    );
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+  await AuthRepository.updatePassword(record.user_id, passwordHash);
+
+  // Consume the token and wipe all others for this user
+  await PasswordResetRepository.markTokenUsed(record.id);
+  await PasswordResetRepository.deleteUserResetTokens(record.user_id);
+
+  // Revoke all active login sessions for security
+  await AuthRepository.revokeAllUserTokens(record.user_id);
+
+  return { message: "Your password has been reset successfully. Please log in." };
+};
+
 export default {
   register,
   login,
@@ -391,6 +472,8 @@ export default {
   refreshTokens,
   getMe,
   changePassword,
+  forgotPassword,
+  resetPassword,
   updateProfile,
   getGithubAuthUrl,
   handleGithubCallback,
