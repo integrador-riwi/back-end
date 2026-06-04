@@ -1,4 +1,10 @@
 import nodemailer from 'nodemailer';
+import dns from 'dns';
+
+// Forzar la resolución de DNS por IPv4 primero.
+// Esto soluciona el error ENETUNREACH en Railway cuando Node intenta 
+// conectarse a la dirección IPv6 de smtp.gmail.com pero la red no tiene ruta.
+dns.setDefaultResultOrder('ipv4first');
 
 const port = parseInt(process.env.EMAIL_PORT) || 587;
 
