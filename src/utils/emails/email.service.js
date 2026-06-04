@@ -1,13 +1,17 @@
 import nodemailer from 'nodemailer';
 
+const port = parseInt(process.env.EMAIL_PORT) || 587;
+
 const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
-    secure: false, // true para puerto 465
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: port,
+    secure: port === 465, // true para puerto 465, false para 587
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
     },
+    // Añadir timeout para que no se quede colgado 1 minuto si falla
+    connectionTimeout: 10000, 
 });
 
 transporter.verify((error) => {
