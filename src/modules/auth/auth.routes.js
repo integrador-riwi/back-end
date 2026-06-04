@@ -17,6 +17,10 @@ router.post("/logout", AuthController.logout);
 
 router.post("/refresh", AuthController.refresh);
 
+// Password recovery (public – no auth required)
+router.post("/forgot-password", AuthController.forgotPassword);
+router.post("/reset-password",  AuthController.resetPassword);
+
 router.get("/me", authenticate, AuthController.getMe);
 
 router.put("/password", authenticate, AuthController.changePassword);
