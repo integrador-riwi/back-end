@@ -160,11 +160,14 @@ export const sendWelcomeEmailsController = async (req, res, next) => {
     if (userIds && Array.isArray(userIds) && userIds.length > 0) {
       // Assuming usersService or repo can fetch multiple users. But we only need email and name.
       // We will loop or do a query. For simplicity, we can fetch all and filter.
-      const allUsers = await usersService.listUsers({ limit: 1000 }); // Or a custom repo method
-      users = allUsers.data.filter(u => userIds.includes(u.id_user));
+      const allUsers = await usersService.listUsers({}, { limit: 1000 }); // Second arg is pagination
+      // Need to convert userIds array to string or integer array matching u.id_user type.
+      // Usually u.id_user is integer. userIds from frontend might be strings.
+      const ids = userIds.map(id => parseInt(id, 10));
+      users = allUsers.users.filter(u => ids.includes(u.id_user));
     } else if (clan) {
-      const allUsers = await usersService.listUsers({ clan, limit: 1000 });
-      users = allUsers.data;
+      const allUsers = await usersService.listUsers({ clan }, { limit: 1000 });
+      users = allUsers.users;
     } else {
       return res.status(400).json({ status: 'error', message: 'Debe proveer userIds o clan' });
     }
