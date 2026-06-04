@@ -13,6 +13,16 @@ import {
 
 const SEMANTIC_SIMILARITY_THRESHOLD = 0.3;
 
+const slugify = (str) =>
+  str
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+
 export const listProjects = async (query) => {
   const { search, page, limit } = query;
 
@@ -318,7 +328,7 @@ export const createProject = async (teamId, data, userId, userRole) => {
         );
   }
 
-  const repoName = `project-${data.name.toLowerCase().replace(/\s+/g, "-")}`;
+  const repoName = `${project.id_project}-${slugify(data.name)}`;
   const repoUrl = `https://github.com/riwi-proyects-integrations/${repoName}`;
 
   try {

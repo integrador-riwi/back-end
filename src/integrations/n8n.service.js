@@ -106,6 +106,7 @@ const n8nService = {
     const response = await axios.post(`${config.n8n.webhookUrl}/secondary-repo-created`, {
       projectId: teamData.projectId ?? teamData.teamId,
       teamId: teamData.teamId,
+      teamName: teamData.teamName ?? null,
       repoSuffix: teamData.label ?? null,
       collaboratorUsername: leader.githubUsername,
       collaboratorToken: leader.githubToken,

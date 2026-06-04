@@ -16,6 +16,16 @@ import {
   emitMemberRemoved,
 } from "../../socket/notifications.js";
 
+const slugify = (str) =>
+  str
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+
 export const createTeam = async (
   data,
   leaderId,
@@ -73,7 +83,7 @@ export const createTeam = async (
   });
 
   try {
-    const repoName = `project-${team.id_team}-${data.name.toLowerCase().replace(/\s+/g, "-")}`;
+    const repoName = `${team.id_team}-${slugify(data.name)}`;
 
     // Fetch event to get githubOrg if provided
     let githubOrg = null;
@@ -788,11 +798,14 @@ export const createAdditionalRepo = async (teamId, data, userId, userRole) => {
     throw new ValidationError("Debes tener GitHub conectado");
   }
 
-  const label = data.label?.trim() || null;
-  if (label && label.length > 50) {
+  const label = data.label?.trim();
+  if (!label) {
+    throw new ValidationError("El label es requerido para crear un repositorio adicional");
+  }
+  if (label.length > 50) {
     throw new ValidationError("El label no puede exceder 50 caracteres");
   }
-  const repoName = `project-${teamId}-${label ? label.toLowerCase().replace(/\s+/g, "-") : Date.now()}`;
+  const repoName = `${teamId}-${slugify(team.name)}-${slugify(label)}`;
 
   let githubOrg = null;
   let githubOrgToken = null;
@@ -810,7 +823,7 @@ export const createAdditionalRepo = async (teamId, data, userId, userRole) => {
 
   try {
     const n8nResponse = await n8nService.triggerSecondaryRepo(
-      { teamId, projectId: team.id_project ?? null, repoName, label, githubOrg },
+      { teamId, projectId: team.id_project ?? null, teamName: team.name, repoName, label, githubOrg },
       {
         githubUsername: leaderWithGithub.github_username,
         githubToken: githubOrgToken ?? leaderWithGithub.github_token,
