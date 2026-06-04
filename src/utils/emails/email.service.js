@@ -1,41 +1,29 @@
-import nodemailer from 'nodemailer';
-import dns from 'dns';
+import { Resend } from 'resend';
 
-// Forzar la resolución de DNS por IPv4 primero.
-// Esto soluciona el error ENETUNREACH en Railway cuando Node intenta 
-// conectarse a la dirección IPv6 de smtp.gmail.com pero la red no tiene ruta.
-dns.setDefaultResultOrder('ipv4first');
-
-const port = parseInt(process.env.EMAIL_PORT) || 587;
-
-const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: port,
-    secure: port === 465, // true para puerto 465, false para 587
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-    // Añadir timeout para que no se quede colgado si falla
-    connectionTimeout: 10000, 
-    // FORZAR IPv4 A NIVEL DE SOCKET (Esto le dice explícitamente a Node.js que ignore IPv6)
-    family: 4, 
-});
-
-transporter.verify((error) => {
-    if (error) console.error('Error de conexión SMTP:', error);
-    else console.log('✅ Servidor de email listo');
-});
+// Initialize Resend with the API key from environment variables
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const sendEmail = async ({ toEmail, toName, subject, html }) => {
-    const mailOptions = {
-        from: `"TeamUp" <${process.env.EMAIL_FROM}>`,
-        to: toEmail,
-        subject,
-        html,
-    };
+    // Determine the sender address. If using Resend without a verified domain, 
+    // it MUST be onboarding@resend.dev (for testing). 
+    // In production with a verified domain, it should be your actual EMAIL_FROM.
+    const fromAddress = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+    
+    // Resend requires the 'to' address. If using the testing domain (onboarding@resend.dev),
+    // you can ONLY send emails to the email address associated with your Resend account.
+    const { data, error } = await resend.emails.send({
+        from: `TeamUp <${fromAddress}>`,
+        to: [toEmail],
+        subject: subject,
+        html: html,
+    });
 
-    return await transporter.sendMail(mailOptions);
+    if (error) {
+        console.error('Error enviando correo con Resend:', error);
+        throw new Error(error.message);
+    }
+
+    return data;
 };
 
 export const sendBulkEmails = async (users) => {
@@ -57,7 +45,7 @@ export const sendBulkEmails = async (users) => {
                     Visitar la TeamUp
                 </a>
             </div>
-    `;
+        `;
 
         try {
             const info = await sendEmail({
@@ -66,11 +54,12 @@ export const sendBulkEmails = async (users) => {
                 subject: `Hola ${user.name}, tenemos novedades`,
                 html,
             });
-            results.push({ email: user.email, success: true, messageId: info.messageId });
+            results.push({ email: user.email, success: true, messageId: info.id });
         } catch (err) {
             results.push({ email: user.email, success: false, error: err.message });
         }
 
+        // Resend API rate limits are generally higher, but keeping a small delay is safe
         await new Promise(resolve => setTimeout(resolve, 300));
     }
 
