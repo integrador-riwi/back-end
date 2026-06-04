@@ -4,13 +4,15 @@ import { Resend } from 'resend';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const sendEmail = async ({ toEmail, toName, subject, html }) => {
-    // Determine the sender address. If using Resend without a verified domain, 
-    // it MUST be onboarding@resend.dev (for testing). 
-    // In production with a verified domain, it should be your actual EMAIL_FROM.
     const fromAddress = process.env.EMAIL_FROM || 'onboarding@resend.dev';
-    
-    // Resend requires the 'to' address. If using the testing domain (onboarding@resend.dev),
-    // you can ONLY send emails to the email address associated with your Resend account.
+    const apiKeySet = !!process.env.RESEND_API_KEY;
+
+    console.log(`[Resend] Attempting to send email:
+  - From: ${fromAddress}
+  - To: ${toEmail}
+  - Subject: ${subject}
+  - API Key set: ${apiKeySet}`);
+
     const { data, error } = await resend.emails.send({
         from: `TeamUp <${fromAddress}>`,
         to: [toEmail],
@@ -19,12 +21,11 @@ export const sendEmail = async ({ toEmail, toName, subject, html }) => {
     });
 
     if (error) {
-        console.error('❌ Error enviando correo con Resend:', error);
-        // Throwing the error here will cause a 500 response in the controller
+        console.error('[Resend] Error response:', JSON.stringify(error, null, 2));
         throw new Error(`Resend Error: ${error.message}`);
     }
 
-    console.log('✅ Correo enviado exitosamente con Resend:', data);
+    console.log('[Resend] Email sent successfully. Response:', JSON.stringify(data, null, 2));
     return data;
 };
 
@@ -34,7 +35,7 @@ export const sendBulkEmails = async (users) => {
     for (const user of users) {
         const html = `
             <div style="font-family: Arial, sans-serif; max-width: 600px;">
-                <h1>Hola, ${user.name}! 👋</h1>
+                <h1>Hola, ${user.name}! </h1>
                 <p>Estas son tus credenciales para TeamUp.</p>
                 <hr>
                 <p>Correo: ${user.email}</p>
