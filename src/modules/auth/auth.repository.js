@@ -68,7 +68,7 @@ export const create = async ({
 export const updatePassword = async (id_user, passwordHash) => {
   const query = `
     UPDATE users 
-    SET encrypted_password = $1, updated_at = NOW()
+    SET encrypted_password = $1
     WHERE id_user = $2
     RETURNING id_user, email
   `;
