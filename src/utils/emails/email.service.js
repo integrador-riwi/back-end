@@ -16,8 +16,10 @@ const transporter = nodemailer.createTransport({
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
     },
-    // Añadir timeout para que no se quede colgado 1 minuto si falla
+    // Añadir timeout para que no se quede colgado si falla
     connectionTimeout: 10000, 
+    // FORZAR IPv4 A NIVEL DE SOCKET (Esto le dice explícitamente a Node.js que ignore IPv6)
+    family: 4, 
 });
 
 transporter.verify((error) => {
