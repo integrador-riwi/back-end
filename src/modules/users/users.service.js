@@ -96,7 +96,11 @@ export const updateUser = async (id, updateData) => {
     throw new NotFoundError('Usuario no encontrado');
   }
 
-  const { name, email, documentNumber, documentType, clan } = updateData;
+  const { name, email, role, documentNumber, documentType, clan } = updateData;
+
+  if (role) {
+    validateRole(role);
+  }
 
   if (email && email.toLowerCase() !== user.email) {
     const existingEmail = await UsersRepository.findByEmail(email, id);
@@ -115,12 +119,33 @@ export const updateUser = async (id, updateData) => {
   const updatedUser = await UsersRepository.update(id, {
     name,
     email,
+    role,
     documentNumber,
     documentType,
     clan
   });
 
   return updatedUser;
+};
+
+export const deleteUser = async (id, requesterId) => {
+  if (parseInt(id, 10) === parseInt(requesterId, 10)) {
+    throw new ForbiddenError('No puedes eliminar tu propia cuenta');
+  }
+
+  const user = await UsersRepository.findById(id);
+
+  if (!user) {
+    throw new NotFoundError('Usuario no encontrado');
+  }
+
+  const deletedUser = await UsersRepository.remove(id);
+
+  if (!deletedUser) {
+    throw new NotFoundError('Usuario no encontrado');
+  }
+
+  return deletedUser;
 };
 
 export const changePassword = async (id, newPassword) => {
@@ -217,6 +242,7 @@ export default {
   getUser,
   createUser,
   updateUser,
+  deleteUser,
   changePassword,
   toggleUserStatus,
   getAvailableCoders,

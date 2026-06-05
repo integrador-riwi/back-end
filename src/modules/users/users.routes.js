@@ -24,6 +24,8 @@ router.put('/:id/password', authenticate, hasRole('ADMIN'), usersController.upda
 
 router.put('/:id/status', authenticate, hasRole('ADMIN'), usersController.toggleStatus);
 
+router.delete('/:id', authenticate, hasRole('ADMIN'), usersController.remove);
+
 router.post('/welcome-email', authenticate, hasRole('ADMIN'), usersController.sendWelcomeEmailsController);
 
 export default router;

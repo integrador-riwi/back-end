@@ -80,6 +80,19 @@ export const updatePassword = async (req, res, next) => {
   }
 };
 
+export const remove = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const requesterId = req.user.id_user;
+
+    await usersService.deleteUser(id, requesterId);
+
+    return noContent(res);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const toggleStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -194,6 +207,7 @@ export default {
   get,
   create,
   update,
+  remove,
   updatePassword,
   toggleStatus,
   getAvailable,

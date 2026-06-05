@@ -183,7 +183,7 @@ export const create = async ({
   }
 };
 
-export const update = async (id, { name, email, documentNumber, documentType, clan }) => {
+export const update = async (id, { name, email, role, documentNumber, documentType, clan }) => {
   const client = await pool.connect();
 
   try {
@@ -194,16 +194,18 @@ export const update = async (id, { name, email, documentNumber, documentType, cl
       SET 
         name = COALESCE($1, name),
         email = COALESCE($2, email),
-        document_number = COALESCE($3, document_number),
-        document_type = COALESCE($4, document_type),
-        clan = COALESCE($5, clan)
-      WHERE id_user = $6
+        role = COALESCE($3, role),
+        document_number = COALESCE($4, document_number),
+        document_type = COALESCE($5, document_type),
+        clan = COALESCE($6, clan)
+      WHERE id_user = $7
       RETURNING id_user, name, email, role, document_number, document_type, clan, is_active
     `;
 
     const userResult = await client.query(userQuery, [
       name,
       email ? email.toLowerCase() : null,
+      role,
       documentNumber,
       documentType,
       clan,
@@ -245,6 +247,42 @@ export const update = async (id, { name, email, documentNumber, documentType, cl
       }
     }
     throw new DatabaseError(`Error al actualizar usuario: ${error.message}`);
+  } finally {
+    client.release();
+  }
+};
+
+export const remove = async (id) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    await client.query('UPDATE refresh_tokens SET revoked_by = NULL WHERE revoked_by = $1', [id]);
+    await client.query('DELETE FROM refresh_tokens WHERE user_id = $1', [id]);
+    await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [id]);
+    await client.query('DELETE FROM team_join_requests WHERE id_user = $1', [id]);
+    await client.query('DELETE FROM team_invitations WHERE id_user = $1 OR invited_by = $1', [id]);
+    await client.query('DELETE FROM team_coders WHERE id_user = $1', [id]);
+    await client.query('DELETE FROM comments WHERE author_user_id = $1', [id]);
+    await client.query('DELETE FROM evaluations WHERE evaluator_user_id = $1', [id]);
+    await client.query('DELETE FROM profiles WHERE user_id = $1', [id]);
+
+    const result = await client.query(
+      'DELETE FROM users WHERE id_user = $1 RETURNING id_user',
+      [id]
+    );
+
+    await client.query('COMMIT');
+    return result.rows[0] || null;
+  } catch (error) {
+    await client.query('ROLLBACK');
+
+    if (error.code === '23503') {
+      throw new ConflictError('No se puede eliminar el usuario porque tiene registros relacionados. Puedes desactivarlo en su lugar.');
+    }
+
+    throw new DatabaseError(`Error al eliminar usuario: ${error.message}`);
   } finally {
     client.release();
   }
@@ -424,6 +462,7 @@ export default {
   findByDocument,
   create,
   update,
+  remove,
   updatePassword,
   toggleStatus,
   findAvailableCoders,
