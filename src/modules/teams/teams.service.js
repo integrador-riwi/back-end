@@ -47,6 +47,16 @@ export const createTeam = async (
     );
   }
 
+  if (!data.description || data.description.trim().length === 0) {
+    throw new ValidationError("La descripción del proyecto es requerida");
+  }
+
+  if (data.description.trim().length < 10) {
+    throw new ValidationError(
+      "La descripción del proyecto debe tener al menos 10 caracteres",
+    );
+  }
+
   const leaderWithGithub = await TeamsRepository.getMemberWithGithub(leaderId);
 
   if (!leaderWithGithub || !leaderWithGithub.github_username) {
