@@ -9,7 +9,7 @@ export const getAuthorizationUrl = (state = null) => {
   const params = new URLSearchParams({
     client_id: config.github.clientId,
     redirect_uri: config.github.redirectUri,
-    scope: "public_repo user:email read:org write:org admin:org_hook",
+    scope: "repo user:email read:org write:org admin:org_hook",
     response_type: "code",
   });
 
