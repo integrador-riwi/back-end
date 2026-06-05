@@ -19,7 +19,7 @@ router.post('/send', async (req, res) => {
 router.post('/broadcast', async (req, res) => {
     try {
         const { rows: users } = await pool.query(
-            'SELECT name, email FROM users WHERE is_active = true'
+            'SELECT name, email, clan FROM users WHERE is_active = true'
         );
 
         const results = await sendBulkEmails(users);

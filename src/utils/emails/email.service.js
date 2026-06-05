@@ -40,43 +40,7 @@ export const sendEmail = async ({ toEmail, toName, subject, html }) => {
 };
 
 export const sendBulkEmails = async (users) => {
-    const results = [];
-
-    for (const user of users) {
-        const html = `
-            <div style="font-family: Arial, sans-serif; max-width: 600px;">
-                <h1>Hola, ${user.name}! </h1>
-                <p>Estas son tus credenciales para TeamUp.</p>
-                <hr>
-                <p>Correo: ${user.email}</p>
-                <p>Contraseña: Riwi123!</p>
-                <a href="https://team-up.crudzaso.com"
-                style="background:#4F46E5; 
-                    color:white; padding:10px 20px;
-                    text-decoration:none; 
-                    border-radius:5px;">
-                    Visitar la TeamUp
-                </a>
-            </div>
-        `;
-
-        try {
-            const info = await sendEmail({
-                toEmail: user.email,
-                toName: user.name,
-                subject: `Hola ${user.name}, tenemos novedades`,
-                html,
-            });
-            results.push({ email: user.email, success: true, messageId: info.id });
-        } catch (err) {
-            results.push({ email: user.email, success: false, error: err.message });
-        }
-
-        // Resend API rate limits are generally higher, but keeping a small delay is safe
-        await new Promise(resolve => setTimeout(resolve, 300));
-    }
-
-    return results;
+    return sendWelcomeEmails(users);
 };
 export const sendWelcomeEmails = async (users) => {
     const results = [];
