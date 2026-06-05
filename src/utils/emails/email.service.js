@@ -3,6 +3,16 @@ import { Resend } from 'resend';
 // Initialize Resend with the API key from environment variables
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+const buildClanPassword = (clan) => {
+    if (!clan) return null;
+
+    const clanText = String(clan).trim();
+    const clanMatch = clanText.match(/\(([^)]+)\)/);
+    const clanName = (clanMatch ? clanMatch[1] : clanText).trim().toLowerCase();
+
+    return clanName ? `${clanName}.riwi2026*` : null;
+};
+
 export const sendEmail = async ({ toEmail, toName, subject, html }) => {
     const fromAddress = process.env.EMAIL_FROM || 'onboarding@resend.dev';
     const apiKeySet = !!process.env.RESEND_API_KEY;
@@ -72,6 +82,17 @@ export const sendWelcomeEmails = async (users) => {
     const results = [];
 
     for (const user of users) {
+        const welcomePassword = buildClanPassword(user.clan);
+
+        if (!welcomePassword) {
+            results.push({
+                email: user.email,
+                success: false,
+                error: 'El usuario no tiene un clan válido para generar la contraseña de bienvenida'
+            });
+            continue;
+        }
+
         const html = `
             <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e8ebf2; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
                 <div style="background-color: #6b5cff; padding: 24px; text-align: center;">
@@ -84,7 +105,7 @@ export const sendWelcomeEmails = async (users) => {
                     
                     <div style="background-color: #f4f6f9; border-radius: 8px; padding: 16px; margin: 24px 0; border-left: 4px solid #eaa2fc;">
                         <p style="margin: 0 0 8px 0;"><strong>Correo:</strong> ${user.email}</p>
-                        <p style="margin: 0;"><strong>Contraseña:</strong> Tu número de documento</p>
+                        <p style="margin: 0;"><strong>Contraseña:</strong> ${welcomePassword}</p>
                     </div>
 
                     <h2 style="font-size: 18px; color: #6b5cff; margin-top: 32px; border-bottom: 2px solid #f4f6f9; padding-bottom: 8px;">Pasos a seguir:</h2>

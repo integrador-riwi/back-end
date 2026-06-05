@@ -15,6 +15,7 @@ register_coders.js
 verify_all_coders.js
 verify_report.json
 users.test.json
+update_passwords_clan.js
 
 # Logs
 logs/
