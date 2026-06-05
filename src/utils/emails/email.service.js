@@ -85,15 +85,6 @@ export const sendWelcomeEmails = async (users) => {
                         </li>
                     </ol>
 
-                    <div style="background-color: #fff0f6; border: 1px solid #fe654f; border-radius: 8px; padding: 16px; margin: 32px 0;">
-                        <p style="margin: 0; font-size: 14px; color: #fe654f; font-weight: 600;">
-                            ⚠️ Importante (Buenas Prácticas):
-                        </p>
-                        <p style="margin: 8px 0 0 0; font-size: 14px; color: #1a1e35;">
-                            Por favor, asegúrate de <strong>no exponer información confidencial</strong> (como variables de entorno, contraseñas o API keys) en tu repositorio de GitHub.
-                        </p>
-                    </div>
-
                     <div style="text-align: center; margin-top: 40px;">
                         <a href="https://team-up.crudzaso.com"
                            style="background-color: #6b5cff; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 30px; font-weight: 600; display: inline-block; box-shadow: 0 4px 12px rgba(107, 92, 255, 0.2);">
