@@ -556,7 +556,8 @@ export const acceptInvitation = async (invitationId, userId) => {
     const leaderWithGithub = await TeamsRepository.getLeaderWithGithub(teamId);
 
     if (leaderWithGithub) {
-      const githubOrg2 = await TeamsRepository.getTeamGithubOrg(teamId);
+      const { githubOrg: githubOrg2, githubOrgToken: githubOrgToken2 } =
+        await TeamsRepository.getTeamGithubOrgWithToken(teamId);
       const allRepoNames = await TeamsRepository.getAllTeamRepoNames(teamId);
       for (const repoName of allRepoNames) {
         await n8nService.triggerMemberInvited(
@@ -565,7 +566,7 @@ export const acceptInvitation = async (invitationId, userId) => {
             projectId: teamId,
             repoName,
             leaderGithubUsername: leaderWithGithub.github_username,
-            leaderToken: leaderWithGithub.github_token,
+            leaderToken: githubOrgToken2 ?? leaderWithGithub.github_token,
             githubOrg: githubOrg2,
           },
           {
@@ -722,7 +723,8 @@ export const acceptJoinRequest = async (requestId, userId, userRole) => {
     const leaderWithGithub = await TeamsRepository.getLeaderWithGithub(teamId);
 
     if (memberWithGithub?.github_username && leaderWithGithub) {
-      const githubOrg3 = await TeamsRepository.getTeamGithubOrg(teamId);
+      const { githubOrg: githubOrg3, githubOrgToken: githubOrgToken3 } =
+        await TeamsRepository.getTeamGithubOrgWithToken(teamId);
       const allRepoNames = await TeamsRepository.getAllTeamRepoNames(teamId);
       for (const repoName of allRepoNames) {
         await n8nService.triggerMemberInvited(
@@ -731,7 +733,7 @@ export const acceptJoinRequest = async (requestId, userId, userRole) => {
             projectId: teamId,
             repoName,
             leaderGithubUsername: leaderWithGithub.github_username,
-            leaderToken: leaderWithGithub.github_token,
+            leaderToken: githubOrgToken3 ?? leaderWithGithub.github_token,
             githubOrg: githubOrg3,
           },
           {

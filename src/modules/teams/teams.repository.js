@@ -559,6 +559,20 @@ export const getTeamGithubOrg = async (teamId) => {
   return result.rows[0]?.github_org ?? null;
 };
 
+export const getTeamGithubOrgWithToken = async (teamId) => {
+  const query = `
+    SELECT e.github_org, e.github_org_token
+    FROM teams t
+           LEFT JOIN events e ON t.id_event = e.id_event
+    WHERE t.id_team = $1
+  `;
+  const result = await pool.query(query, [teamId]);
+  return {
+    githubOrg: result.rows[0]?.github_org ?? null,
+    githubOrgToken: result.rows[0]?.github_org_token ?? null,
+  };
+};
+
 export const getTeamEventMaxSize = async (teamId) => {
   const query = `
     SELECT COALESCE(e.max_team_size, 5) as max_team_size
@@ -1159,6 +1173,7 @@ export default {
   getTeamProject,
   saveTeamProject,
   getTeamGithubOrg,
+  getTeamGithubOrgWithToken,
   getTeamEventMaxSize,
   findLeaderTeam,
   createJoinRequest,
