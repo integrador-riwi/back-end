@@ -163,7 +163,7 @@ export const createTeam = async (
 };
 
 export const listTeams = async (query) => {
-  const { search, page, limit, idEvent, includeSubmitted } = query;
+  const { search, page, limit, idEvent, includeSubmitted, includeClosed } = query;
 
   const pageNum = parseInt(page) || 1;
   const limitNum = parseInt(limit) || 10;
@@ -178,6 +178,7 @@ export const listTeams = async (query) => {
     limit: limitNum,
     idEvent,
     includeSubmitted: includeSubmitted === "true" || includeSubmitted === true,
+    includeClosed: includeClosed === "true" || includeClosed === true,
   });
 };
 
@@ -271,11 +272,33 @@ export const deleteTeam = async (id, userRole) => {
   return deletedTeam;
 };
 
+export const closeTeam = async (id, userRole) => {
+  if (userRole !== "ADMIN") {
+    throw new ForbiddenError("Solo los administradores pueden cerrar equipos");
+  }
+
+  const team = await TeamsRepository.findById(id);
+
+  if (!team) {
+    throw new NotFoundError("Equipo no encontrado");
+  }
+
+  if (team.closed_at) {
+    throw new ValidationError("El equipo ya está cerrado");
+  }
+
+  return TeamsRepository.close(id);
+};
+
 export const addMemberToTeam = async (teamId, memberData, userId, userRole) => {
   const team = await TeamsRepository.findById(teamId);
 
   if (!team) {
     throw new NotFoundError("Equipo no encontrado");
+  }
+
+  if (team.closed_at) {
+    throw new ForbiddenError("El equipo está cerrado y no acepta nuevos miembros");
   }
 
   const isLeader = await TeamsRepository.isLeader(teamId, userId);
@@ -628,6 +651,10 @@ export const requestToJoinTeam = async (teamId, userId) => {
     throw new NotFoundError("Equipo no encontrado");
   }
 
+  if (team.closed_at) {
+    throw new ForbiddenError("El equipo está cerrado y no acepta solicitudes");
+  }
+
   const alreadyInTeam = await TeamsRepository.isInAnyTeam(
     userId,
     team.id_event ?? null,
@@ -962,6 +989,7 @@ export default {
   getTeamSimple,
   updateTeam,
   deleteTeam,
+  closeTeam,
   addMemberToTeam,
   removeMemberFromTeam,
   getMyTeams,

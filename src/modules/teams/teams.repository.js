@@ -53,6 +53,7 @@ export const findAll = async ({
   limit = 10,
   idEvent = null,
   includeSubmitted = false,
+  includeClosed = false,
 }) => {
   let whereClauses = [];
   let params = [];
@@ -66,6 +67,10 @@ export const findAll = async ({
   if (idEvent) {
     whereClauses.push(`t.id_event = $${paramIndex++}`);
     params.push(idEvent);
+  }
+
+  if (!includeClosed) {
+    whereClauses.push("t.closed_at IS NULL");
   }
 
   // Exclude submitted teams unless the caller explicitly requests all (e.g. TL evaluation view)
@@ -93,6 +98,7 @@ export const findAll = async ({
       t.name,
       t.id_event,
       t.created_at,
+      t.closed_at,
       u.id_user as leader_id,
       u.name as leader_name,
       u.email as leader_email,
@@ -120,7 +126,7 @@ export const findAll = async ({
     LEFT JOIN users u ON tc.id_user = u.id_user
     LEFT JOIN projects p ON p.team_id = t.id_team
     ${whereClause}
-    GROUP BY t.id_team, u.id_user, u.name, u.email, u.github_avatar_url, t.created_at, p.description, p.submitted_at, p.preview_photo_url
+    GROUP BY t.id_team, u.id_user, u.name, u.email, u.github_avatar_url, t.created_at, t.closed_at, p.description, p.submitted_at, p.preview_photo_url
     ORDER BY t.created_at DESC
     LIMIT $${paramIndex++} OFFSET $${paramIndex++}
   `;
@@ -146,6 +152,7 @@ export const findById = async (id) => {
       t.name,
       t.id_event,
       t.created_at,
+      t.closed_at,
       u.id_user as leader_id,
       u.name as leader_name,
       u.email as leader_email
@@ -166,6 +173,7 @@ export const findByIdWithMembers = async (id) => {
       t.name,
       t.id_event,
       t.created_at,
+      t.closed_at,
       lu.id_user as leader_id,
       lu.name as leader_name,
       lu.email as leader_email
@@ -218,6 +226,18 @@ export const update = async (id, { name }) => {
   `;
 
   const result = await pool.query(query, [name, id]);
+  return result.rows[0] || null;
+};
+
+export const close = async (id) => {
+  const query = `
+    UPDATE teams
+    SET closed_at = COALESCE(closed_at, NOW())
+    WHERE id_team = $1
+    RETURNING id_team, name, id_event, created_at, closed_at
+  `;
+
+  const result = await pool.query(query, [id]);
   return result.rows[0] || null;
 };
 
@@ -361,6 +381,7 @@ export const getMyTeams = async (userId) => {
       t.name,
       t.created_at,
       t.id_event,
+      t.closed_at,
       tc.team_role,
       u.id_user as leader_id,
       u.name as leader_name,
@@ -1153,6 +1174,7 @@ export default {
   findById,
   findByIdWithMembers,
   update,
+  close,
   remove,
   addMember,
   removeMember,
