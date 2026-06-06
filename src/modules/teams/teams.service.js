@@ -870,7 +870,7 @@ export const createAdditionalRepo = async (teamId, data, userId, userRole) => {
           projectId: teamId,
           repoName: savedRepoName,
           leaderGithubUsername: leaderWithGithub.github_username,
-          leaderToken: leaderWithGithub.github_token,
+          leaderToken: githubOrgToken ?? leaderWithGithub.github_token,
           githubOrg,
         },
         {
