@@ -41,6 +41,9 @@ router.put("/:id", authenticate, TeamsController.update);
 
 router.delete("/:id", authenticate, hasRole("ADMIN"), TeamsController.remove);
 
+router.post("/:id/close", authenticate, TeamsController.close);
+router.post("/:id/reopen", authenticate, TeamsController.reopen);
+
 router.post("/:id/members", authenticate, TeamsController.addMember);
 
 router.delete(

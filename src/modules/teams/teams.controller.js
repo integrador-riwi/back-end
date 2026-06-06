@@ -19,7 +19,8 @@ export const create = asyncHandler(async (req, res) => {
 });
 
 export const list = asyncHandler(async (req, res) => {
-  const { search, page, limit, idEvent, includeSubmitted } = req.query;
+  const { search, page, limit, idEvent, includeSubmitted, includeClosed } =
+    req.query;
 
   const result = await TeamsService.listTeams({
     search,
@@ -27,6 +28,7 @@ export const list = asyncHandler(async (req, res) => {
     limit,
     idEvent,
     includeSubmitted,
+    includeClosed,
   });
 
   return success(res, result);
@@ -68,6 +70,32 @@ export const remove = asyncHandler(async (req, res) => {
   await TeamsService.deleteTeam(id, userRole);
 
   return success(res, { message: "Equipo eliminado correctamente" });
+});
+
+export const close = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id_user;
+  const userRole = req.user.role;
+
+  const team = await TeamsService.closeTeam(id, userId, userRole);
+
+  return success(res, {
+    message: "Equipo cerrado correctamente",
+    team,
+  });
+});
+
+export const reopen = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id_user;
+  const userRole = req.user.role;
+
+  const team = await TeamsService.reopenTeam(id, userId, userRole);
+
+  return success(res, {
+    message: "Equipo reabierto correctamente",
+    team,
+  });
 });
 
 export const addMember = asyncHandler(async (req, res) => {
@@ -331,6 +359,8 @@ export default {
   getSimple,
   update,
   remove,
+  close,
+  reopen,
   addMember,
   removeMember,
   getMembers,

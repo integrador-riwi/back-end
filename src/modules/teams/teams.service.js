@@ -163,7 +163,8 @@ export const createTeam = async (
 };
 
 export const listTeams = async (query) => {
-  const { search, page, limit, idEvent, includeSubmitted } = query;
+  const { search, page, limit, idEvent, includeSubmitted, includeClosed } =
+    query;
 
   const pageNum = parseInt(page) || 1;
   const limitNum = parseInt(limit) || 10;
@@ -178,6 +179,7 @@ export const listTeams = async (query) => {
     limit: limitNum,
     idEvent,
     includeSubmitted: includeSubmitted === "true" || includeSubmitted === true,
+    includeClosed: includeClosed === "true" || includeClosed === true,
   });
 };
 
@@ -271,11 +273,57 @@ export const deleteTeam = async (id, userRole) => {
   return deletedTeam;
 };
 
+export const closeTeam = async (id, userId, userRole) => {
+  const team = await TeamsRepository.findById(id);
+
+  if (!team) {
+    throw new NotFoundError("Equipo no encontrado");
+  }
+
+  const isLeader = await TeamsRepository.isLeader(id, userId);
+  const isAdmin = userRole === "ADMIN";
+
+  if (!isLeader && !isAdmin) {
+    throw new ForbiddenError("No tienes permiso para cerrar este equipo");
+  }
+
+  if (team.closed_at) {
+    return team;
+  }
+
+  return TeamsRepository.close(id);
+};
+
+export const reopenTeam = async (id, userId, userRole) => {
+  const team = await TeamsRepository.findById(id);
+
+  if (!team) {
+    throw new NotFoundError("Equipo no encontrado");
+  }
+
+  const isLeader = await TeamsRepository.isLeader(id, userId);
+  const isAdmin = userRole === "ADMIN";
+
+  if (!isLeader && !isAdmin) {
+    throw new ForbiddenError("No tienes permiso para reabrir este equipo");
+  }
+
+  if (!team.closed_at) {
+    return team;
+  }
+
+  return TeamsRepository.reopen(id);
+};
+
 export const addMemberToTeam = async (teamId, memberData, userId, userRole) => {
   const team = await TeamsRepository.findById(teamId);
 
   if (!team) {
     throw new NotFoundError("Equipo no encontrado");
+  }
+
+  if (team.closed_at) {
+    throw new ForbiddenError("El equipo está cerrado y no acepta nuevos miembros");
   }
 
   const isLeader = await TeamsRepository.isLeader(teamId, userId);
@@ -541,6 +589,11 @@ export const acceptInvitation = async (invitationId, userId) => {
     throw new ValidationError("Esta invitación ya ha sido procesada");
   }
 
+  const team = await TeamsRepository.findById(invitation.id_team);
+  if (team?.closed_at) {
+    throw new ValidationError("El equipo está cerrado y no acepta nuevos miembros");
+  }
+
   const memberWithGithub = await TeamsRepository.getMemberWithGithub(userId);
 
   if (!memberWithGithub || !memberWithGithub.github_username) {
@@ -584,7 +637,6 @@ export const acceptInvitation = async (invitationId, userId) => {
   }
 
   try {
-    const team = await TeamsRepository.findById(invitation.id_team);
     const user = await TeamsRepository.getMemberWithGithub(userId);
     emitInvitationAccepted(invitation, team, user);
   } catch (err) {
@@ -626,6 +678,10 @@ export const requestToJoinTeam = async (teamId, userId) => {
   const team = await TeamsRepository.findById(teamId);
   if (!team) {
     throw new NotFoundError("Equipo no encontrado");
+  }
+
+  if (team.closed_at) {
+    throw new ValidationError("El equipo está cerrado y no acepta solicitudes");
   }
 
   const alreadyInTeam = await TeamsRepository.isInAnyTeam(
@@ -710,6 +766,11 @@ export const acceptJoinRequest = async (requestId, userId, userRole) => {
 
   if (!isLeaderOrAdmin && !isAdmin) {
     throw new ForbiddenError("No tienes permiso para aceptar esta solicitud");
+  }
+
+  const team = await TeamsRepository.findById(request.id_team);
+  if (team?.closed_at) {
+    throw new ValidationError("El equipo está cerrado y no acepta nuevos miembros");
   }
 
   const result = await TeamsRepository.acceptJoinRequest(requestId);
@@ -962,6 +1023,8 @@ export default {
   getTeamSimple,
   updateTeam,
   deleteTeam,
+  closeTeam,
+  reopenTeam,
   addMemberToTeam,
   removeMemberFromTeam,
   getMyTeams,
