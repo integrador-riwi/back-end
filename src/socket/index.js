@@ -5,13 +5,23 @@ let _io = null;
 
 const connectedUsers = new Map();
 
+const ALLOWED_ORIGINS = [
+  "https://front-end-olive-six.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "https://front-end3-bice.vercel.app",
+  "http://localhost:3000",
+  "https://team-up.crudzaso.com",
+  "https://front-end-integrador-zatc.onrender.com",
+];
+
 export function initializeSocket(server) {
   const io = new Server(server, {
     cors: {
-      origin: process.env.FRONTEND_URL || "http://localhost:5173",
+      origin: ALLOWED_ORIGINS,
       methods: ["GET", "POST"],
-      credentials: true
-    }
+      credentials: true,
+    },
   });
 
   _io = io;
