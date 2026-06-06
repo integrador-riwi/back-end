@@ -47,6 +47,7 @@ export const findAll = async ({ role, clan, isActive, search, page = 1, limit = 
       u.document_type,
       u.clan,
       u.is_active,
+      u.github_avatar_url,
       u.github_username,
       p.description as profile_description
     FROM users u
