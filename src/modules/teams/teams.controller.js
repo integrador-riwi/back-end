@@ -1,5 +1,5 @@
 import TeamsService from "./teams.service.js";
-import { success, created } from "../../utils/response.js";
+import { success, created, error } from "../../utils/response.js";
 import { asyncHandler } from "../../middleware/errorHandler.js";
 // Google AI Search By Description
 import { searchProjectByDescription } from "../../integrations/Google AI/searchService.js";
@@ -88,12 +88,16 @@ export const addMember = asyncHandler(async (req, res) => {
 
 export const removeMember = asyncHandler(async (req, res) => {
   const { id, userId } = req.params;
+  const parsedUserId = parseInt(userId);
+  if (!userId || userId === "undefined" || isNaN(parsedUserId)) {
+    return error(res, "userId inválido", 400);
+  }
   const userIdCurrent = req.user.id_user;
   const userRole = req.user.role;
 
   await TeamsService.removeMemberFromTeam(
     id,
-    parseInt(userId),
+    parsedUserId,
     userIdCurrent,
     userRole,
   );
