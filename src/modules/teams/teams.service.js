@@ -837,6 +837,7 @@ export const createAdditionalRepo = async (teamId, data, userId, userRole) => {
       {
         githubUsername: leaderWithGithub.github_username,
         githubToken: githubOrgToken ?? leaderWithGithub.github_token,
+        githubPersonalToken: leaderWithGithub.github_token,
       },
     );
     const n8nData = n8nResponse?.data?.data ?? n8nResponse?.data ?? null;

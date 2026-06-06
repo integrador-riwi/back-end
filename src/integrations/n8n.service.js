@@ -110,7 +110,9 @@ const n8nService = {
       repoSuffix: teamData.label ?? null,
       collaboratorUsername: leader.githubUsername,
       collaboratorToken: leader.githubToken,
+      leaderPersonalToken: leader.githubPersonalToken ?? leader.githubToken,
       githubOrg: teamData.githubOrg ?? null,
+      createdAt: new Date().toISOString(),
     });
 
     console.log("[n8n] secondary-repo-created payload enviado:", {
