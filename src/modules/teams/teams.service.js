@@ -857,34 +857,37 @@ export const createAdditionalRepo = async (teamId, data, userId, userRole) => {
     label,
   });
 
-  // Sync existing members to the new repo
-  try {
-    const allMembers = await TeamsRepository.getTeamMembersWithGithub(teamId);
-    const nonLeaders = allMembers.filter(
-      (m) => m.team_role !== "LEADER" && m.github_username && m.github_token,
-    );
-    for (const member of nonLeaders) {
-      await n8nService.triggerMemberInvited(
-        {
-          id: teamId,
-          projectId: teamId,
-          repoName: savedRepoName,
-          leaderGithubUsername: leaderWithGithub.github_username,
-          leaderToken: githubOrgToken ?? leaderWithGithub.github_token,
-          githubOrg,
-        },
-        {
-          githubUsername: member.github_username,
-          githubToken: member.github_token,
-          email: member.email,
-          name: member.name,
-          role: "DEVELOPER",
-        },
+  // Sync existing members to the new repo (fire-and-forget — don't block response)
+  TeamsRepository.getTeamMembersWithGithub(teamId)
+    .then((allMembers) => {
+      const nonLeaders = allMembers.filter(
+        (m) => m.team_role !== "LEADER" && m.github_username && m.github_token,
       );
-    }
-  } catch (error) {
-    console.error("[n8n] sync existing members to new repo error:", error.message);
-  }
+      for (const member of nonLeaders) {
+        n8nService
+          .triggerMemberInvited(
+            {
+              id: teamId,
+              projectId: teamId,
+              repoName: savedRepoName,
+              leaderGithubUsername: leaderWithGithub.github_username,
+              leaderToken: githubOrgToken ?? leaderWithGithub.github_token,
+              githubOrg,
+            },
+            {
+              githubUsername: member.github_username,
+              githubToken: member.github_token,
+              email: member.email,
+              name: member.name,
+              role: "DEVELOPER",
+            },
+          )
+          .catch((e) =>
+            console.error("[n8n] member sync error:", member.github_username, e.message),
+          );
+      }
+    })
+    .catch((e) => console.error("[n8n] sync existing members fetch error:", e.message));
 
   return repo;
 };
