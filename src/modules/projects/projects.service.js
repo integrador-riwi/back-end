@@ -243,6 +243,8 @@ export const submitProject = async (id, userId, userRole) => {
         } catch (_) {}
       }
 
+      const additionalRepos = await TeamsRepository.getAdditionalRepos(project.team_id);
+
       await n8nService.triggerProjectSubmitted(
           {
             id: project.id_project,
@@ -250,6 +252,10 @@ export const submitProject = async (id, userId, userRole) => {
             repoUrl: project.repo_url,
             githubOrg,
             orgToken,
+            additionalRepos: additionalRepos.map((r) => ({
+              repoName: r.repo_name,
+              repoUrl: r.repo_url,
+            })),
           },
           {
             githubUsername: leaderGithub.github_username,

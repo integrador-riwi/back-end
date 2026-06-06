@@ -42,6 +42,7 @@ const n8nService = {
         leaderToken: leader.githubToken,
         orgToken: projectData.orgToken ?? null,
         githubOrg: projectData.githubOrg ?? null,
+        additionalRepos: projectData.additionalRepos ?? [],
         submittedAt: new Date().toISOString(),
       },
     );
