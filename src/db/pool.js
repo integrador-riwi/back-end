@@ -40,4 +40,22 @@ const testConnection = async () => {
 
 testConnection();
 
+export const ensureRuntimeSchema = async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE teams
+      ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NULL
+    `);
+
+    await pool.query(`
+      COMMENT ON COLUMN teams.closed_at IS
+      'Timestamp when a team was closed to new invitations and join requests. NULL means open.'
+    `);
+
+    console.log('✅ Runtime schema checked');
+  } catch (err) {
+    console.warn('⚠️ Runtime schema check skipped:', err.message);
+  }
+};
+
 export default pool;

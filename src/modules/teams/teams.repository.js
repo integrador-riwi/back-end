@@ -5,6 +5,29 @@ import {
   DatabaseError,
 } from "../../middleware/errorHandler.js";
 
+let hasClosedAtColumnCache = null;
+
+const hasClosedAtColumn = async () => {
+  if (hasClosedAtColumnCache !== null) return hasClosedAtColumnCache;
+
+  const result = await pool.query(
+    `
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name = 'teams'
+        AND column_name = 'closed_at'
+      LIMIT 1
+    `,
+  );
+
+  hasClosedAtColumnCache = result.rowCount > 0;
+  return hasClosedAtColumnCache;
+};
+
+const closedAtSelect = (alias = "t") =>
+  hasClosedAtColumnCache ? `${alias}.closed_at` : "NULL::timestamp AS closed_at";
+
 export const create = async ({ name, leaderId, idEvent = null }) => {
   const client = await pool.connect();
 
@@ -55,6 +78,7 @@ export const findAll = async ({
   includeSubmitted = false,
   includeClosed = false,
 }) => {
+  const supportsClosedAt = await hasClosedAtColumn();
   let whereClauses = [];
   let params = [];
   let paramIndex = 1;
@@ -74,7 +98,7 @@ export const findAll = async ({
     whereClauses.push(`(p.submitted_at IS NULL OR p.id_project IS NULL)`);
   }
 
-  if (!includeClosed) {
+  if (!includeClosed && supportsClosedAt) {
     whereClauses.push(`t.closed_at IS NULL`);
   }
 
@@ -98,7 +122,7 @@ export const findAll = async ({
       t.name,
       t.id_event,
       t.created_at,
-      t.closed_at,
+      ${supportsClosedAt ? "t.closed_at" : "NULL::timestamp AS closed_at"},
       u.id_user as leader_id,
       u.name as leader_name,
       u.email as leader_email,
@@ -126,7 +150,7 @@ export const findAll = async ({
     LEFT JOIN users u ON tc.id_user = u.id_user
     LEFT JOIN projects p ON p.team_id = t.id_team
     ${whereClause}
-    GROUP BY t.id_team, u.id_user, u.name, u.email, u.github_avatar_url, t.created_at, t.closed_at, p.description, p.submitted_at, p.preview_photo_url
+    GROUP BY t.id_team, u.id_user, u.name, u.email, u.github_avatar_url, t.created_at${supportsClosedAt ? ", t.closed_at" : ""}, p.description, p.submitted_at, p.preview_photo_url
     ORDER BY t.created_at DESC
     LIMIT $${paramIndex++} OFFSET $${paramIndex++}
   `;
@@ -146,13 +170,14 @@ export const findAll = async ({
 };
 
 export const findById = async (id) => {
+  const supportsClosedAt = await hasClosedAtColumn();
   const query = `
     SELECT
       t.id_team,
       t.name,
       t.id_event,
       t.created_at,
-      t.closed_at,
+      ${supportsClosedAt ? "t.closed_at" : "NULL::timestamp AS closed_at"},
       u.id_user as leader_id,
       u.name as leader_name,
       u.email as leader_email
@@ -167,13 +192,14 @@ export const findById = async (id) => {
 };
 
 export const findByIdWithMembers = async (id) => {
+  const supportsClosedAt = await hasClosedAtColumn();
   const teamQuery = `
     SELECT
       t.id_team,
       t.name,
       t.id_event,
       t.created_at,
-      t.closed_at,
+      ${supportsClosedAt ? "t.closed_at" : "NULL::timestamp AS closed_at"},
       lu.id_user as leader_id,
       lu.name as leader_name,
       lu.email as leader_email
@@ -230,6 +256,12 @@ export const update = async (id, { name }) => {
 };
 
 export const close = async (id) => {
+  if (!(await hasClosedAtColumn())) {
+    throw new ConflictError(
+      "La base de datos no tiene habilitado el cierre de equipos",
+    );
+  }
+
   const query = `
     UPDATE teams
     SET closed_at = COALESCE(closed_at, NOW())
@@ -242,6 +274,12 @@ export const close = async (id) => {
 };
 
 export const reopen = async (id) => {
+  if (!(await hasClosedAtColumn())) {
+    throw new ConflictError(
+      "La base de datos no tiene habilitada la reapertura de equipos",
+    );
+  }
+
   const query = `
     UPDATE teams
     SET closed_at = NULL
@@ -387,12 +425,13 @@ export const removeMember = async (teamId, userId) => {
 };
 
 export const getMyTeams = async (userId) => {
+  const supportsClosedAt = await hasClosedAtColumn();
   const query = `
     SELECT
       t.id_team,
       t.name,
       t.created_at,
-      t.closed_at,
+      ${supportsClosedAt ? "t.closed_at" : "NULL::timestamp AS closed_at"},
       t.id_event,
       tc.team_role,
       u.id_user as leader_id,

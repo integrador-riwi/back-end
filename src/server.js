@@ -6,14 +6,24 @@ import http from 'http';
 import app from './app.js';
 import { initializeSocket } from './socket/index.js';
 import { setSocketIO } from './socket/notifications.js';
+import { ensureRuntimeSchema } from './db/pool.js';
 
 const PORT = process.env.PORT || 3000;
 
-const server = http.createServer(app);
+const startServer = async () => {
+  await ensureRuntimeSchema();
 
-const io = initializeSocket(server);
-setSocketIO(io);
+  const server = http.createServer(app);
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  const io = initializeSocket(server);
+  setSocketIO(io);
+
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+};
+
+startServer().catch((err) => {
+  console.error('❌ Server startup failed:', err.message);
+  process.exit(1);
 });
