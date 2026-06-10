@@ -981,33 +981,40 @@ export const createJoinRequest = async (teamId, userId) => {
       throw new ConflictError("Ya eres miembro del equipo");
     }
 
-    // Then check for existing requests
-    const checkExisting = `
-      SELECT id_request, status FROM team_join_requests
-      WHERE id_team = $1 AND id_user = $2
-    `;
-    const existing = await client.query(checkExisting, [teamId, userId]);
-
-    if (existing.rows.length > 0) {
-      if (existing.rows[0].status === "PENDING") {
-        await client.query("ROLLBACK");
-        throw new ConflictError("Ya existe una solicitud pendiente");
-      }
-      // If status is REJECTED, allow creating a new request
-      if (existing.rows[0].status === "APPROVED") {
-        await client.query("ROLLBACK");
-        throw new ConflictError("Ya eres miembro del equipo");
-      }
-      // If REJECTED, continue to create new request
-    }
-
     const query = `
       INSERT INTO team_join_requests (id_team, id_user, status)
       VALUES ($1, $2, 'PENDING')
+      ON CONFLICT (id_team, id_user)
+      DO UPDATE
+        SET status = 'PENDING',
+            created_at = NOW(),
+            updated_at = NOW()
+      WHERE team_join_requests.status IN ('REJECTED', 'CANCELLED')
       RETURNING id_request, id_team, id_user, status, created_at
     `;
 
     const result = await client.query(query, [teamId, userId]);
+
+    if (result.rows.length === 0) {
+      const existing = await client.query(
+        `
+          SELECT id_request, status
+          FROM team_join_requests
+          WHERE id_team = $1 AND id_user = $2
+        `,
+        [teamId, userId],
+      );
+
+      if (existing.rows[0]?.status === "PENDING") {
+        throw new ConflictError("Ya tienes una solicitud pendiente para este equipo");
+      }
+
+      if (existing.rows[0]?.status === "APPROVED") {
+        throw new ConflictError("Ya eres miembro del equipo");
+      }
+
+      throw new ConflictError("No se pudo crear la solicitud para este equipo");
+    }
 
     await client.query("COMMIT");
 
