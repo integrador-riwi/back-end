@@ -3,16 +3,6 @@ import { Resend } from 'resend';
 // Initialize Resend with the API key from environment variables
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const buildClanPassword = (clan) => {
-    if (!clan) return null;
-
-    const clanText = String(clan).trim();
-    const clanMatch = clanText.match(/\(([^)]+)\)/);
-    const clanName = (clanMatch ? clanMatch[1] : clanText).trim().toLowerCase();
-
-    return clanName ? `${clanName}.riwi2026*` : null;
-};
-
 export const sendEmail = async ({ toEmail, toName, subject, html }) => {
     const fromAddress = process.env.EMAIL_FROM || 'onboarding@resend.dev';
     const apiKeySet = !!process.env.RESEND_API_KEY;
@@ -40,23 +30,48 @@ export const sendEmail = async ({ toEmail, toName, subject, html }) => {
 };
 
 export const sendBulkEmails = async (users) => {
-    return sendWelcomeEmails(users);
+    const results = [];
+
+    for (const user of users) {
+        const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px;">
+                <h1>Hola, ${user.name}! </h1>
+                <p>Estas son tus credenciales para TeamUp.</p>
+                <hr>
+                <p>Correo: ${user.email}</p>
+                <p>Contraseña: Riwi123!</p>
+                <a href="https://team-up.crudzaso.com"
+                style="background:#4F46E5; 
+                    color:white; padding:10px 20px;
+                    text-decoration:none; 
+                    border-radius:5px;">
+                    Visitar la TeamUp
+                </a>
+            </div>
+        `;
+
+        try {
+            const info = await sendEmail({
+                toEmail: user.email,
+                toName: user.name,
+                subject: `Hola ${user.name}, tenemos novedades`,
+                html,
+            });
+            results.push({ email: user.email, success: true, messageId: info.id });
+        } catch (err) {
+            results.push({ email: user.email, success: false, error: err.message });
+        }
+
+        // Resend API rate limits are generally higher, but keeping a small delay is safe
+        await new Promise(resolve => setTimeout(resolve, 300));
+    }
+
+    return results;
 };
 export const sendWelcomeEmails = async (users) => {
     const results = [];
 
     for (const user of users) {
-        const welcomePassword = buildClanPassword(user.clan);
-
-        if (!welcomePassword) {
-            results.push({
-                email: user.email,
-                success: false,
-                error: 'El usuario no tiene un clan válido para generar la contraseña de bienvenida'
-            });
-            continue;
-        }
-
         const html = `
             <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e8ebf2; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
                 <div style="background-color: #6b5cff; padding: 24px; text-align: center;">
@@ -69,7 +84,7 @@ export const sendWelcomeEmails = async (users) => {
                     
                     <div style="background-color: #f4f6f9; border-radius: 8px; padding: 16px; margin: 24px 0; border-left: 4px solid #eaa2fc;">
                         <p style="margin: 0 0 8px 0;"><strong>Correo:</strong> ${user.email}</p>
-                        <p style="margin: 0;"><strong>Contraseña:</strong> ${welcomePassword}</p>
+                        <p style="margin: 0;"><strong>Contraseña:</strong> Tu número de documento</p>
                     </div>
 
                     <h2 style="font-size: 18px; color: #6b5cff; margin-top: 32px; border-bottom: 2px solid #f4f6f9; padding-bottom: 8px;">Pasos a seguir:</h2>
