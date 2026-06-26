@@ -334,26 +334,65 @@ export const getRubricsForEvent = async (eventId) => {
 
 export const updateRubric = async (
   rubricId,
-  { name, description, weight, active },
+  { name, description, weight, active, grades },
 ) => {
-  const result = await pool.query(
-    `UPDATE rubrics
-     SET
-       name        = COALESCE($1, name),
-       description = COALESCE($2, description),
-       weight      = COALESCE($3, weight),
-       active      = COALESCE($4, active)
-     WHERE id_rubric = $5
-     RETURNING id_rubric, id_event, area, name, description, weight, active`,
-    [
-      name ?? null,
-      description ?? null,
-      weight ?? null,
-      active ?? null,
-      rubricId,
-    ],
-  );
-  return result.rows[0] || null;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    
+    const result = await client.query(
+      `UPDATE rubrics
+       SET
+         name        = COALESCE($1, name),
+         description = COALESCE($2, description),
+         weight      = COALESCE($3, weight),
+         active      = COALESCE($4, active)
+       WHERE id_rubric = $5
+       RETURNING id_rubric, id_event, area, name, description, weight, active`,
+      [
+        name ?? null,
+        description ?? null,
+        weight ?? null,
+        active ?? null,
+        rubricId,
+      ],
+    );
+
+    if (grades && Array.isArray(grades)) {
+      for (const g of grades) {
+        if (g.id_grade) {
+          await client.query(
+            `UPDATE grades SET score = $1, name = $2, description = $3 WHERE id_grade = $4 AND id_rubric = $5`,
+            [g.score, g.name || null, g.description || null, g.id_grade, rubricId]
+          );
+        } else {
+          const existing = await client.query(
+            `SELECT id_grade FROM grades WHERE id_rubric = $1 AND score = $2`,
+            [rubricId, g.score]
+          );
+          if (existing.rows.length > 0) {
+            await client.query(
+              `UPDATE grades SET name = $1, description = $2 WHERE id_grade = $3`,
+              [g.name || null, g.description || null, existing.rows[0].id_grade]
+            );
+          } else {
+            await client.query(
+              `INSERT INTO grades (id_rubric, score, name, description) VALUES ($1, $2, $3, $4)`,
+              [rubricId, g.score, g.name || null, g.description || null]
+            );
+          }
+        }
+      }
+    }
+
+    await client.query("COMMIT");
+    return result.rows[0] || null;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 /**

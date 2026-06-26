@@ -221,6 +221,7 @@ export const updateRubric = async (eventId, rubricId, data) => {
     description: data.description,
     weight: data.weight,
     active: data.active,
+    grades: data.grades,
   });
 
   if (!updated) throw new NotFoundError("Rúbrica no encontrada");
