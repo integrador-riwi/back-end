@@ -381,7 +381,7 @@ export const closeEventEvaluations = async (eventId) => {
       `SELECT DISTINCT p.id_project
        FROM projects p
               JOIN evaluations e ON e.project_id = p.id_project
-       WHERE p.id_event = $1 AND p.submitted_at IS NOT NULL`,
+       WHERE p.id_event = $1`,
       [eventId],
   ).then(async (res) => {
     for (const row of res.rows) {
