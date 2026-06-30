@@ -32,7 +32,7 @@ export const getRankingStatus = async (eventId) => {
       fullyEvaluatedProjects: 0,
       allProjectsEvaluated: false,
       hasIncompleteEvaluations: false,
-      canPublish: isDeadlinePassed,
+      canPublish: false,
       projects: [],
     };
   }
@@ -64,7 +64,7 @@ export const getRankingStatus = async (eventId) => {
     fullyEvaluatedProjects,
     allProjectsEvaluated,
     hasIncompleteEvaluations: !allProjectsEvaluated,
-    canPublish: true, // Admin can always publish — UI shows warnings if deadline hasn't passed
+    canPublish: allProjectsEvaluated,
     projects,
   };
 };
@@ -77,6 +77,12 @@ export const publishRanking = async (eventId, requestingRole) => {
   const status = await getRankingStatus(eventId);
 
   const incompleteProjects = status.projects.filter((p) => !p.fullyEvaluated);
+  if (incompleteProjects.length > 0) {
+    throw new ValidationError(
+        "No se puede publicar el ranking hasta que cada proyecto tenga al menos una calificación por cada área activa.",
+    );
+  }
+
   const evaluationWarnings = incompleteProjects.map((p) => ({
     projectId: p.id,
     team: p.team,

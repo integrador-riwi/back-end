@@ -226,11 +226,11 @@ export const getProjectResults = async (projectId) => {
     return result.rows;
 };
 
-// ── Evaluator-count check (max 3 per area per project) ───────────────────────
+// ── Evaluator counts per area per project ────────────────────────────────────
 
 /**
  * Returns the number of distinct evaluators who have already submitted
- * evaluations for (projectId, area). Used to enforce the 3-evaluator cap.
+ * evaluations for (projectId, area). Used for coverage/status displays.
  */
 export const countEvaluatorsForArea = async (projectId, area) => {
     const query = `

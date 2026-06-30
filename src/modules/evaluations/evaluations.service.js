@@ -15,8 +15,6 @@ const ROLE_AREA_MAP = {
   TL_ENGLISH: "ENGLISH",
 };
 
-const MAX_EVALUATORS_PER_AREA = 3;
-
 // ── Get rubrics + grade options for an event ──────────────────────────────────
 
 export const getRubricsForEvent = async (eventId) => {
@@ -100,17 +98,6 @@ export const submitEvaluations = async ({
     if (alreadySubmittedArea) {
       throw new ForbiddenError(
           `You have already submitted evaluations for the ${allowedArea} area of this project.`,
-      );
-    }
-
-    // ── Rule: max 3 evaluators per area ─────────────────────────────────────
-    const evaluatorCount = await EvaluationsRepository.countEvaluatorsForArea(
-        projectId,
-        allowedArea,
-    );
-    if (evaluatorCount >= MAX_EVALUATORS_PER_AREA) {
-      throw new ForbiddenError(
-          `The ${allowedArea} area for this project has already reached the maximum of ${MAX_EVALUATORS_PER_AREA} evaluators.`,
       );
     }
   }
@@ -244,10 +231,44 @@ export const calculateProjectGrades = async (projectId, requestingRole) => {
   if (!projectRes.rows[0]) throw new NotFoundError("Project not found.");
 
   const projectRow = projectRes.rows[0];
+  let eventId = projectRow.id_event ?? projectRow.team_event_id ?? null;
   if (!projectRow.id_event && projectRow.team_event_id) {
     await pool.query(
         "UPDATE projects SET id_event = $1 WHERE id_project = $2",
         [projectRow.team_event_id, projectId],
+    );
+    eventId = projectRow.team_event_id;
+  }
+
+  if (!eventId) {
+    throw new ValidationError("This project is not linked to an event.");
+  }
+
+  const requiredAreasRes = await pool.query(
+      `SELECT DISTINCT area FROM rubrics WHERE id_event = $1 AND active = true`,
+      [eventId],
+  );
+  const requiredAreas = requiredAreasRes.rows.map((r) => r.area);
+
+  if (requiredAreas.length === 0) {
+    throw new ValidationError(
+        "This event does not have active rubrics configured.",
+    );
+  }
+
+  const coveredAreasRes = await pool.query(
+      `SELECT DISTINCT e.area
+       FROM evaluations e
+              JOIN rubrics r ON r.area = e.area AND r.id_event = $2 AND r.active = true
+       WHERE e.project_id = $1`,
+      [projectId, eventId],
+  );
+  const coveredAreas = coveredAreasRes.rows.map((r) => r.area);
+  const missingAreas = requiredAreas.filter((area) => !coveredAreas.includes(area));
+
+  if (missingAreas.length > 0) {
+    throw new ValidationError(
+        `This project needs at least one evaluation in each active area before calculating grades. Missing: ${missingAreas.join(", ")}.`,
     );
   }
 
@@ -372,11 +393,17 @@ export const closeEventEvaluations = async (eventId) => {
     throw new ValidationError("Evaluations are already closed for this event.");
   }
 
-  // Close unconditionally — admin decision
+  const coverage = await EvaluationsRepository.getEventEvalCoverage(eventId);
+  if (!coverage.canClose) {
+    throw new ValidationError(
+        "Every project must have at least one evaluation in each active area before closing evaluations.",
+    );
+  }
+
+  // Close only after every active rubric area has at least one evaluation.
   const result = await EvaluationsRepository.setEvaluationsClosed(eventId, true);
 
-  // Fire-and-forget: calculate grades for every project that has at least
-  // one evaluation (even if not all areas are covered)
+  // Fire-and-forget: coverage is already complete, so each project can be calculated.
   pool.query(
       `SELECT DISTINCT p.id_project
        FROM projects p
@@ -412,7 +439,7 @@ export const reopenEventEvaluations = async (eventId) => {
 /**
  * Returns, for a given project + evaluator:
  *   - evaluations_closed   : whether the event has closed evaluations
- *   - area_closed          : whether the TL's area is already at max evaluators
+ *   - area_closed          : kept for frontend compatibility; always false
  *   - already_submitted    : whether this TL already submitted for their area
  *   - evaluator_count      : how many evaluators have graded their area
  */
@@ -447,10 +474,10 @@ export const getProjectEvalStatus = async (projectId, evaluatorUserId, evaluator
 
   return {
     evaluations_closed,
-    area_closed: evaluatorCount >= MAX_EVALUATORS_PER_AREA,
+    area_closed: false,
     already_submitted: alreadySubmitted,
     evaluator_count: evaluatorCount,
-    max_evaluators: MAX_EVALUATORS_PER_AREA,
+    max_evaluators: null,
     area: allowedArea,
   };
 };
