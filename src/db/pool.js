@@ -4,7 +4,10 @@ import config from '../config/env.js';
 const poolConfig = config.db.connectionString
   ? {
       connectionString: config.db.connectionString,
-      ssl: { rejectUnauthorized: false }
+      ssl: { rejectUnauthorized: false },
+      max: config.db.max,
+      idleTimeoutMillis: config.db.idleTimeoutMillis,
+      connectionTimeoutMillis: config.db.connectionTimeoutMillis
     }
   : {
       host: config.db.host,
@@ -50,6 +53,36 @@ export const ensureRuntimeSchema = async () => {
     await pool.query(`
       COMMENT ON COLUMN teams.closed_at IS
       'Timestamp when a team was closed to new invitations and join requests. NULL means open.'
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_individual_project_results_project_user
+      ON individual_project_results(project_id, user_id)
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_individual_area_results_project_user
+      ON individual_area_results(project_id, user_id)
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_evaluations_project_area
+      ON evaluations(project_id, area)
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_evaluations_event_project_area
+      ON evaluations(event_id, project_id, area)
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_rubrics_event_active_area
+      ON rubrics(id_event, active, area)
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_team_coders_team_user
+      ON team_coders(id_team, id_user)
     `);
 
     console.log('✅ Runtime schema checked');

@@ -49,6 +49,18 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  res.on("finish", () => {
+    const durationMs = Date.now() - startedAt;
+    if (durationMs >= 1000) {
+      console.warn(
+        `[slow-request] ${req.method} ${req.originalUrl} ${res.statusCode} ${durationMs}ms`,
+      );
+    }
+  });
+  next();
+});
 
 app.use("/api/webhooks", githubWebhookRouter);
 

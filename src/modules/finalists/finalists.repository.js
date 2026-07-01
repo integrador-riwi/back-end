@@ -50,17 +50,34 @@ export const getFinalistsCountByEvent = async (eventId) => {
 // members with a zero score in any evaluated area are excluded from the average.
 export const getTopProjectsByScore = async (eventId, limit = 3) => {
     const result = await pool.query(
-        `WITH ranked_members AS (
+        `WITH project_members AS (
              SELECT
-                 ipr.*,
-                 NOT EXISTS (
-                     SELECT 1
-                     FROM individual_area_results zero_area
-                     WHERE zero_area.project_id = ipr.project_id
-                       AND zero_area.user_id    = ipr.user_id
-                       AND COALESCE(zero_area.final_score, 0) = 0
-                 ) AS counts_for_team_average
+                 ipr.project_id,
+                 ipr.user_id,
+                 ipr.final_score
              FROM individual_project_results ipr
+             JOIN projects p ON p.id_project = ipr.project_id
+             WHERE p.id_event = $1
+         ),
+         member_area_results AS (
+             SELECT
+                 pm.project_id,
+                 pm.user_id,
+                 COALESCE(BOOL_OR(COALESCE(iar.final_score, 0) = 0), false) AS has_zero_area
+             FROM project_members pm
+             LEFT JOIN individual_area_results iar
+               ON iar.project_id = pm.project_id
+              AND iar.user_id    = pm.user_id
+             GROUP BY pm.project_id, pm.user_id
+         ),
+         ranked_members AS (
+             SELECT
+                 pm.*,
+                 NOT mar.has_zero_area AS counts_for_team_average
+             FROM project_members pm
+             JOIN member_area_results mar
+               ON mar.project_id = pm.project_id
+              AND mar.user_id    = pm.user_id
          )
          SELECT
              p.id_project,
