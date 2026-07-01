@@ -68,41 +68,60 @@ export const getEventEvaluationStatus = async (eventId) => {
 };
 
 /**
- * Returns the full ranking for an event:
- * team average score = average of all individual final_scores in that team's project.
+ * Returns the full ranking for an event.
+ *
+ * Team average excludes members with a zero score in any evaluated area.
  * Ordered by team_score DESC.
  */
 export const getEventRanking = async (eventId) => {
   const query = `
+    WITH ranked_members AS (
+      SELECT
+        ipr.*,
+        NOT EXISTS (
+          SELECT 1
+          FROM individual_area_results zero_area
+          WHERE zero_area.project_id = ipr.project_id
+            AND zero_area.user_id    = ipr.user_id
+            AND COALESCE(zero_area.final_score, 0) = 0
+        ) AS counts_for_team_average
+      FROM individual_project_results ipr
+    )
     SELECT
       p.id_project,
       p.name                                  AS project_name,
       p.repo_url,
       t.id_team,
       t.name                                  AS team_name,
-      ROUND(AVG(ipr.final_score)::numeric, 2) AS team_score,
-      COUNT(ipr.user_id)                      AS member_count,
+      ROUND(
+        COALESCE(AVG(rm.final_score) FILTER (WHERE rm.counts_for_team_average), 0)::numeric,
+        2
+      ) AS team_score,
+      COUNT(rm.user_id)                       AS member_count,
+      COUNT(rm.user_id) FILTER (WHERE rm.counts_for_team_average)
+                                                AS averaged_member_count,
       json_agg(
         json_build_object(
-          'user_id',    ipr.user_id,
+          'user_id',    rm.user_id,
           'user_name',  u.name,
           'avatar_url', u.github_avatar_url,
-          'score',      ipr.final_score,
+          'score',      rm.final_score,
+          'counts_for_team_average', rm.counts_for_team_average,
           'area_scores', (
             SELECT json_agg(
               json_build_object('area', iar.area, 'score', iar.final_score)
               ORDER BY iar.area
             )
             FROM individual_area_results iar
-            WHERE iar.project_id = ipr.project_id
-              AND iar.user_id    = ipr.user_id
+            WHERE iar.project_id = rm.project_id
+              AND iar.user_id    = rm.user_id
           )
-        ) ORDER BY ipr.final_score DESC
+        ) ORDER BY rm.final_score DESC
       ) AS members
-    FROM individual_project_results ipr
-    JOIN projects p  ON p.id_project  = ipr.project_id
+    FROM ranked_members rm
+    JOIN projects p  ON p.id_project  = rm.project_id
     JOIN teams t     ON t.id_team     = p.team_id
-    JOIN users u     ON u.id_user     = ipr.user_id
+    JOIN users u     ON u.id_user     = rm.user_id
     WHERE p.id_event = $1
     GROUP BY p.id_project, p.name, p.repo_url, t.id_team, t.name
     ORDER BY team_score DESC

@@ -46,18 +46,33 @@ export const getFinalistsCountByEvent = async (eventId) => {
     return result.rows[0].count;
 };
 
-// Returns all projects for an event with their average score from individual_project_results.
-// This is the same source used by the ranking module.
+// Returns all projects for an event with the same team score rule used by ranking:
+// members with a zero score in any evaluated area are excluded from the average.
 export const getTopProjectsByScore = async (eventId, limit = 3) => {
     const result = await pool.query(
-        `SELECT
+        `WITH ranked_members AS (
+             SELECT
+                 ipr.*,
+                 NOT EXISTS (
+                     SELECT 1
+                     FROM individual_area_results zero_area
+                     WHERE zero_area.project_id = ipr.project_id
+                       AND zero_area.user_id    = ipr.user_id
+                       AND COALESCE(zero_area.final_score, 0) = 0
+                 ) AS counts_for_team_average
+             FROM individual_project_results ipr
+         )
+         SELECT
              p.id_project,
              p.name                                  AS project_name,
              t.id_team,
              t.name                                  AS team_name,
-             ROUND(AVG(ipr.final_score)::numeric, 4) AS team_score
-         FROM individual_project_results ipr
-                  JOIN projects p ON p.id_project = ipr.project_id
+             ROUND(
+                 COALESCE(AVG(rm.final_score) FILTER (WHERE rm.counts_for_team_average), 0)::numeric,
+                 4
+             ) AS team_score
+         FROM ranked_members rm
+                  JOIN projects p ON p.id_project = rm.project_id
                   JOIN teams t    ON t.id_team    = p.team_id
          WHERE p.id_event = $1
          GROUP BY p.id_project, p.name, t.id_team, t.name
