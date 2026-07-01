@@ -384,6 +384,163 @@ export const calculateProjectGrades = async (projectId, requestingRole) => {
   return savedResults;
 };
 
+export const recalculateExistingEventResults = async (eventId, requestingRole) => {
+  if (requestingRole !== "ADMIN") {
+    throw new ForbiddenError("Only Admins can recalculate existing results.");
+  }
+
+  const eventRes = await pool.query(
+      "SELECT id_event FROM events WHERE id_event = $1",
+      [eventId],
+  );
+  if (!eventRes.rows[0]) throw new NotFoundError("Event not found.");
+
+  const projectIds =
+      await EvaluationsRepository.getProjectsWithExistingResultsForEvent(eventId);
+
+  if (!projectIds.length) {
+    throw new NotFoundError(
+        "No existing calculated results found for this event.",
+    );
+  }
+
+  const AREA_WEIGHTS = {
+    DEVELOPMENT: 0.55,
+    ENGLISH: 0.25,
+    SOFT_SKILLS: 0.2,
+  };
+
+  const summary = {
+    eventId,
+    projectsFound: projectIds.length,
+    projectsProcessed: 0,
+    projectResultsUpdated: 0,
+    areaResultsUpdated: 0,
+    skippedProjects: [],
+    skippedMembers: 0,
+  };
+
+  for (const projectId of projectIds) {
+    const rawRows =
+        await EvaluationsRepository.getRawEvaluationsForProject(projectId);
+
+    if (!rawRows.length) {
+      summary.skippedProjects.push({
+        projectId,
+        reason: "No raw evaluations found.",
+      });
+      continue;
+    }
+
+    const existingProjectUsers =
+        await EvaluationsRepository.getExistingProjectResultUsers(projectId);
+    const existingUserIds = new Set(
+        existingProjectUsers.map((row) => Number(row.user_id)),
+    );
+
+    if (existingUserIds.size === 0) {
+      summary.skippedProjects.push({
+        projectId,
+        reason: "No existing individual project results found.",
+      });
+      continue;
+    }
+
+    const existingAreaRows =
+        await EvaluationsRepository.getExistingAreaResultRows(projectId);
+    const existingAreaKeys = new Set(
+        existingAreaRows.map((row) => `${Number(row.user_id)}:${row.area}`),
+    );
+
+    const rubrics = await EvaluationsRepository.getRubricsForProject(projectId);
+    const rubricWeightMap = {};
+    for (const r of rubrics) {
+      rubricWeightMap[r.id_rubric] = parseFloat(r.weight);
+    }
+
+    const studentMap = {};
+    for (const row of rawRows) {
+      const uid = Number(row.evaluated_user_id);
+      if (!existingUserIds.has(uid)) {
+        summary.skippedMembers += 1;
+        continue;
+      }
+
+      const area = row.area;
+      const rubricId = row.id_rubric;
+      const score = parseFloat(row.score);
+
+      if (!studentMap[uid]) {
+        studentMap[uid] = { name: row.evaluated_name, areas: {} };
+      }
+      if (!studentMap[uid].areas[area]) {
+        studentMap[uid].areas[area] = {};
+      }
+      if (!studentMap[uid].areas[area][rubricId]) {
+        studentMap[uid].areas[area][rubricId] = [];
+      }
+      studentMap[uid].areas[area][rubricId].push(score);
+    }
+
+    for (const [userIdStr, student] of Object.entries(studentMap)) {
+      const userId = Number(userIdStr);
+      const areaFinalScores = {};
+
+      for (const [area, rubricsInArea] of Object.entries(student.areas)) {
+        let weightedSum = 0;
+        let totalWeight = 0;
+
+        for (const [rubricIdStr, scores] of Object.entries(rubricsInArea)) {
+          const rubricId = Number(rubricIdStr);
+          const weight = rubricWeightMap[rubricId] ?? 1;
+          const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+
+          weightedSum += avgScore * weight;
+          totalWeight += weight;
+        }
+
+        const areaScore = totalWeight > 0 ? weightedSum / totalWeight : 0;
+        areaFinalScores[area] = parseFloat(areaScore.toFixed(2));
+
+        if (existingAreaKeys.has(`${userId}:${area}`)) {
+          const updatedArea = await EvaluationsRepository.updateAreaResult({
+            projectId,
+            userId,
+            area,
+            finalScore: areaFinalScores[area],
+          });
+          if (updatedArea) summary.areaResultsUpdated += 1;
+        }
+      }
+
+      let weightedAreaSum = 0;
+      let totalAreaWeight = 0;
+
+      for (const [area, score] of Object.entries(areaFinalScores)) {
+        const areaWeight = AREA_WEIGHTS[area] ?? 0;
+        weightedAreaSum += score * areaWeight;
+        totalAreaWeight += areaWeight;
+      }
+
+      const studentFinal =
+          totalAreaWeight > 0
+              ? parseFloat((weightedAreaSum / totalAreaWeight).toFixed(2))
+              : 0;
+
+      const updatedProject = await EvaluationsRepository.updateProjectResult({
+        projectId,
+        userId,
+        finalScore: studentFinal,
+      });
+      if (updatedProject) summary.projectResultsUpdated += 1;
+    }
+
+    summary.projectsProcessed += 1;
+  }
+
+  return summary;
+};
+
 // ── Close / reopen evaluations for an event (ADMIN only) ─────────────────────
 
 export const closeEventEvaluations = async (eventId) => {
@@ -563,6 +720,7 @@ export default {
   submitEvaluations,
   getMyEvaluationsForProject,
   calculateProjectGrades,
+  recalculateExistingEventResults,
   getProjectResults,
   getEventResults,
   closeEventEvaluations,

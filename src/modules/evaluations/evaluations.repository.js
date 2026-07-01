@@ -195,6 +195,72 @@ export const upsertProjectResult = async ({
     return result.rows[0];
 };
 
+export const getProjectsWithExistingResultsForEvent = async (eventId) => {
+    const query = `
+        SELECT DISTINCT ipr.project_id
+        FROM individual_project_results ipr
+                 JOIN projects p ON p.id_project = ipr.project_id
+        WHERE p.id_event = $1
+        ORDER BY ipr.project_id
+    `;
+    const result = await pool.query(query, [eventId]);
+    return result.rows.map((row) => row.project_id);
+};
+
+export const getExistingProjectResultUsers = async (projectId) => {
+    const query = `
+        SELECT user_id
+        FROM individual_project_results
+        WHERE project_id = $1
+    `;
+    const result = await pool.query(query, [projectId]);
+    return result.rows;
+};
+
+export const getExistingAreaResultRows = async (projectId) => {
+    const query = `
+        SELECT user_id, area
+        FROM individual_area_results
+        WHERE project_id = $1
+    `;
+    const result = await pool.query(query, [projectId]);
+    return result.rows;
+};
+
+export const updateAreaResult = async ({
+                                           projectId,
+                                           userId,
+                                           area,
+                                           finalScore,
+                                       }) => {
+    const query = `
+        UPDATE individual_area_results
+        SET final_score = $4, calculated_at = now()
+        WHERE project_id = $1
+          AND user_id = $2
+          AND area = $3::evaluation_area
+        RETURNING *
+    `;
+    const result = await pool.query(query, [projectId, userId, area, finalScore]);
+    return result.rows[0] || null;
+};
+
+export const updateProjectResult = async ({
+                                              projectId,
+                                              userId,
+                                              finalScore,
+                                          }) => {
+    const query = `
+        UPDATE individual_project_results
+        SET final_score = $3, calculated_at = now()
+        WHERE project_id = $1
+          AND user_id = $2
+        RETURNING *
+    `;
+    const result = await pool.query(query, [projectId, userId, finalScore]);
+    return result.rows[0] || null;
+};
+
 // ── Read results ─────────────────────────────────────────────────────────────
 
 export const getProjectResults = async (projectId) => {
@@ -428,6 +494,11 @@ export default {
     getRubricsForProject,
     upsertAreaResult,
     upsertProjectResult,
+    getProjectsWithExistingResultsForEvent,
+    getExistingProjectResultUsers,
+    getExistingAreaResultRows,
+    updateAreaResult,
+    updateProjectResult,
     getProjectResults,
     getEventResults,
     countEvaluatorsForArea,

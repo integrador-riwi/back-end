@@ -75,6 +75,22 @@ const EvaluationsController = {
     return success(res, results);
   }),
 
+  // POST /api/evaluations/event/:eventId/recalculate-existing-results
+  // Updates only already-created calculated rows. It does not insert missing
+  // individual_project_results or individual_area_results records.
+  recalculateExistingEventResults: asyncHandler(async (req, res) => {
+    const eventId = parseInt(req.params.eventId);
+    const requestingRole = req.user.role;
+    const result = await EvaluationsService.recalculateExistingEventResults(
+        eventId,
+        requestingRole,
+    );
+    return success(res, {
+      message: "Existing calculated results updated successfully.",
+      ...result,
+    });
+  }),
+
   // GET /api/evaluations/event/:eventId/coverage
   // Returns per-project area coverage so the admin can see readiness to close.
   getEventEvalCoverage: asyncHandler(async (req, res) => {

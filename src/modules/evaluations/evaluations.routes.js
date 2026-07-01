@@ -54,6 +54,13 @@ router.get(
     EvaluationsController.getEventResults,
 );
 
+router.post(
+    "/event/:eventId/recalculate-existing-results",
+    authenticate,
+    hasRole("ADMIN"),
+    EvaluationsController.recalculateExistingEventResults,
+);
+
 // GET /api/evaluations/event/:eventId/coverage
 // Any TL or ADMIN can check coverage before the admin closes.
 router.get(
