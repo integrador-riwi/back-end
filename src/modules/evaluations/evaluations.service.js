@@ -83,25 +83,6 @@ export const submitEvaluations = async ({
     throw new ValidationError("You must provide at least one evaluation.");
   }
 
-  // ── Rule: TL cannot re-submit for an area they already graded ────────────
-  // Determine which area(s) this submission targets (derived from gradeIds)
-  // We resolve the area per grade inside the loop below, but we need a pre-check.
-  // We'll do a lightweight check: if the TL already has ANY row for this project
-  // in their restricted area, block early.
-  if (allowedArea) {
-    const alreadySubmittedArea =
-        await EvaluationsRepository.hasEvaluatorSubmittedArea(
-            projectId,
-            evaluatorUserId,
-            allowedArea,
-        );
-    if (alreadySubmittedArea) {
-      throw new ForbiddenError(
-          `You have already submitted evaluations for the ${allowedArea} area of this project.`,
-      );
-    }
-  }
-
   // Wrap all inserts in a transaction — if any row fails the whole submit rolls back,
   // leaving no partial/orphan rows that would permanently block the TL.
   const client = await pool.connect();
@@ -141,14 +122,14 @@ export const submitEvaluations = async ({
 
       const saved = await client.query(
           `INSERT INTO evaluations
-           (project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade)
-           VALUES ($1, $2, $3, $4, $5::evaluation_area, $6, $7)
-           ON CONFLICT (project_id, evaluator_user_id, evaluated_user_id, area)
+           (project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade, id_rubric)
+           VALUES ($1, $2, $3, $4, $5::evaluation_area, $6, $7, $8)
+           ON CONFLICT (project_id, evaluator_user_id, evaluated_user_id, id_rubric)
              DO UPDATE SET
                          feedback = EXCLUDED.feedback,
                          id_grade = EXCLUDED.id_grade,
                          event_id = EXCLUDED.event_id
-           RETURNING id_evaluation, project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade, created_at`,
+           RETURNING id_evaluation, project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade, id_rubric, created_at`,
           [
             projectId,
             eventId,
@@ -157,6 +138,7 @@ export const submitEvaluations = async ({
             area,
             feedback ?? null,
             gradeId,
+            gradeRow.id_rubric,
           ],
       );
 

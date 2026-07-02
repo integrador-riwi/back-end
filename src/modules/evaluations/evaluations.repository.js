@@ -64,20 +64,18 @@ export const upsertEvaluation = async ({
                                            area,
                                            feedback,
                                            gradeId,
+                                           idRubric,
                                        }) => {
-    // Single upsert — works regardless of whether a unique constraint exists
-    // on (project_id, evaluator_user_id, evaluated_user_id, area) or not.
-    // If the constraint exists it updates; if not it tries to find & update manually.
     const query = `
         INSERT INTO evaluations
-        (project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade)
-        VALUES ($1, $2, $3, $4, $5::evaluation_area, $6, $7)
-        ON CONFLICT (project_id, evaluator_user_id, evaluated_user_id, area)
+        (project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade, id_rubric)
+        VALUES ($1, $2, $3, $4, $5::evaluation_area, $6, $7, $8)
+        ON CONFLICT (project_id, evaluator_user_id, evaluated_user_id, id_rubric)
             DO UPDATE SET
                           feedback  = EXCLUDED.feedback,
                           id_grade  = EXCLUDED.id_grade,
                           event_id  = EXCLUDED.event_id
-        RETURNING id_evaluation, project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade, created_at
+        RETURNING id_evaluation, project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade, id_rubric, created_at
     `;
     const result = await pool.query(query, [
         projectId,
@@ -87,6 +85,7 @@ export const upsertEvaluation = async ({
         area,
         feedback ?? null,
         gradeId,
+        idRubric,
     ]);
     return result.rows[0];
 };
@@ -103,10 +102,10 @@ export const getEvaluationsByProject = async (projectId, evaluatorUserId) => {
             e.feedback,
             e.created_at,
             e.id_grade,
+            e.id_rubric,
             g.score,
             g.name AS grade_name,
             g.description AS grade_description,
-            g.id_rubric,
             u.name AS evaluated_name,
             r.name AS rubric_name,
             r.weight
@@ -146,7 +145,7 @@ export const getEvaluationSummaryByProjectAndEvaluator = async (
                 MAX(e.created_at) AS last_evaluated_at
             FROM evaluations e
                      JOIN grades g ON g.id_grade = e.id_grade
-                     JOIN rubrics r ON r.id_rubric = g.id_rubric
+                     JOIN rubrics r ON r.id_rubric = e.id_rubric
                      JOIN users u ON u.id_user = e.evaluated_user_id
             WHERE e.project_id = $1
               AND e.evaluator_user_id = $2
@@ -222,16 +221,16 @@ export const getRawEvaluationsForProject = async (projectId) => {
             e.evaluated_user_id,
             e.evaluator_user_id,
             e.area,
-            g.id_rubric,
+            e.id_rubric,
             r.weight,
             g.score,
             u.name AS evaluated_name
         FROM evaluations e
                  JOIN grades g ON e.id_grade = g.id_grade
-                 JOIN rubrics r ON g.id_rubric = r.id_rubric
+                 JOIN rubrics r ON e.id_rubric = r.id_rubric
                  JOIN users u ON e.evaluated_user_id = u.id_user
         WHERE e.project_id = $1
-        ORDER BY e.evaluated_user_id, e.area, g.id_rubric
+        ORDER BY e.evaluated_user_id, e.area, e.id_rubric
     `;
     const result = await pool.query(query, [projectId]);
     return result.rows;
@@ -670,7 +669,7 @@ export const getGradeAuditByEvent = async (eventId) => {
             evaluated.email AS evaluated_email,
             evaluated.role AS evaluated_role,
             evaluated.clan AS evaluated_clan,
-            r.id_rubric,
+            e.id_rubric,
             r.name AS rubric_name,
             r.description AS rubric_description,
             r.weight AS rubric_weight,
@@ -687,7 +686,7 @@ export const getGradeAuditByEvent = async (eventId) => {
                  JOIN users evaluator ON evaluator.id_user = e.evaluator_user_id
                  JOIN users evaluated ON evaluated.id_user = e.evaluated_user_id
                  JOIN grades g ON g.id_grade = e.id_grade
-                 JOIN rubrics r ON r.id_rubric = g.id_rubric
+                 JOIN rubrics r ON r.id_rubric = e.id_rubric
                  LEFT JOIN individual_area_results iar
                            ON iar.project_id = e.project_id
                           AND iar.user_id = e.evaluated_user_id
@@ -727,7 +726,7 @@ export const getTeamAreaAuditSummaryByEvent = async (eventId) => {
                      JOIN projects p ON p.id_project = e.project_id
                      JOIN teams t ON t.id_team = p.team_id
                      JOIN grades g ON g.id_grade = e.id_grade
-                     JOIN rubrics r ON r.id_rubric = g.id_rubric
+                     JOIN rubrics r ON r.id_rubric = e.id_rubric
             WHERE p.id_event = $1
             GROUP BY
                 p.id_project,
@@ -736,7 +735,7 @@ export const getTeamAreaAuditSummaryByEvent = async (eventId) => {
                 t.name,
                 e.area,
                 e.evaluated_user_id,
-                r.id_rubric,
+                e.id_rubric,
                 r.weight
         ),
         member_area_scores AS (
