@@ -4,9 +4,9 @@
 -- INSERT would conflict and OVERWRITE the previous row via ON CONFLICT DO UPDATE.
 -- Only one rubric per area per member survived (the last one processed).
 --
--- This migration detects those orphaned rubrics and creates placeholder rows
--- with the lowest grade for each missing rubric. TLs can then edit and assign
--- the correct grade.
+-- This migration detects orphaned rubrics and creates rows for them, copying the
+-- same grade score from the surviving rubric for that same member. If no matching
+-- score exists in the target rubric, falls back to the lowest grade.
 
 INSERT INTO evaluations (project_id, event_id, evaluator_user_id, evaluated_user_id, area, feedback, id_grade, id_rubric)
 SELECT
@@ -16,20 +16,23 @@ SELECT
     e.evaluated_user_id,
     e.area,
     NULL AS feedback,
-    lg.id_grade,
+    COALESCE(match_grade.id_grade, lowest_grade.id_grade) AS id_grade,
     r.id_rubric
 FROM evaluations e
 JOIN projects p ON p.id_project = e.project_id
 JOIN rubrics r ON r.id_event = COALESCE(e.event_id, p.id_event)
               AND r.area = e.area
               AND r.active = true
+JOIN grades g ON g.id_grade = e.id_grade
+LEFT JOIN grades match_grade ON match_grade.id_rubric = r.id_rubric
+                           AND match_grade.score = g.score
 JOIN LATERAL (
-    SELECT g.id_grade
-    FROM grades g
-    WHERE g.id_rubric = r.id_rubric
-    ORDER BY g.score ASC
+    SELECT g3.id_grade
+    FROM grades g3
+    WHERE g3.id_rubric = r.id_rubric
+    ORDER BY g3.score ASC
     LIMIT 1
-) lg ON true
+) lowest_grade ON true
 WHERE COALESCE(e.event_id, p.id_event) IS NOT NULL
   AND NOT EXISTS (
     SELECT 1
