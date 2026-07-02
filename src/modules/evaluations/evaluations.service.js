@@ -726,7 +726,10 @@ export const getGradeAuditByEvent = async (eventId, requestingRole) => {
   );
   if (!eventRes.rows[0]) throw new NotFoundError("Event not found.");
 
-  const rows = await EvaluationsRepository.getGradeAuditByEvent(eventId);
+  const [rows, areaSummary] = await Promise.all([
+    EvaluationsRepository.getGradeAuditByEvent(eventId),
+    EvaluationsRepository.getTeamAreaAuditSummaryByEvent(eventId),
+  ]);
   const teamIds = new Set(rows.map((row) => row.id_team).filter(Boolean));
   const projectIds = new Set(rows.map((row) => row.project_id).filter(Boolean));
   const evaluatorIds = new Set(rows.map((row) => row.evaluator_user_id).filter(Boolean));
@@ -745,6 +748,7 @@ export const getGradeAuditByEvent = async (eventId, requestingRole) => {
       areas: Array.from(areas).sort(),
       zeroScores,
     },
+    areaSummary,
     rows,
   };
 };

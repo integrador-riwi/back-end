@@ -538,6 +538,38 @@ export const getGradeAuditByEvent = async (eventId) => {
     return result.rows;
 };
 
+export const getTeamAreaAuditSummaryByEvent = async (eventId) => {
+    const query = `
+        SELECT
+            p.id_project,
+            p.name AS project_name,
+            t.id_team,
+            t.name AS team_name,
+            iar.area,
+            ROUND(
+                COALESCE(
+                    AVG(iar.final_score) FILTER (WHERE COALESCE(iar.final_score, 0) <> 0),
+                    0
+                )::numeric,
+                2
+            ) AS area_score,
+            COUNT(iar.user_id) AS member_count,
+            COUNT(iar.user_id) FILTER (WHERE COALESCE(iar.final_score, 0) <> 0)
+                AS counted_member_count,
+            COUNT(iar.user_id) FILTER (WHERE COALESCE(iar.final_score, 0) = 0)
+                AS zero_member_count,
+            MAX(iar.calculated_at) AS last_calculated_at
+        FROM projects p
+                 JOIN teams t ON t.id_team = p.team_id
+                 JOIN individual_area_results iar ON iar.project_id = p.id_project
+        WHERE p.id_event = $1
+        GROUP BY p.id_project, p.name, t.id_team, t.name, iar.area
+        ORDER BY t.name, p.name, iar.area
+    `;
+    const result = await pool.query(query, [eventId]);
+    return result.rows;
+};
+
 export default {
     getRubricsByEvent,
     getGradesByRubric,
@@ -556,6 +588,7 @@ export default {
     getProjectResults,
     getEventResults,
     getGradeAuditByEvent,
+    getTeamAreaAuditSummaryByEvent,
     countEvaluatorsForArea,
     hasEvaluatorSubmittedArea,
     getEventEvalStatus,
