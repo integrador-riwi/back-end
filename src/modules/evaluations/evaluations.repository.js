@@ -717,7 +717,7 @@ export const getTeamAreaAuditSummaryByEvent = async (eventId) => {
                 t.name AS team_name,
                 e.area,
                 e.evaluated_user_id,
-                r.id_rubric,
+                e.id_rubric,
                 COALESCE(NULLIF(r.weight, 0), 1) AS rubric_weight,
                 AVG(g.score) AS rubric_score,
                 COUNT(DISTINCT e.evaluator_user_id) AS evaluator_count,
