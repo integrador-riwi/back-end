@@ -47,52 +47,65 @@ export const getFinalistsCountByEvent = async (eventId) => {
 };
 
 // Returns all projects for an event with the same team score rule used by ranking:
-// members with a zero score in any evaluated area are excluded from the average.
+// each area excludes only members with a zero score in that specific area.
 export const getTopProjectsByScore = async (eventId, limit = 3) => {
     const result = await pool.query(
-        `WITH project_members AS (
-             SELECT
-                 ipr.project_id,
-                 ipr.user_id,
-                 ipr.final_score
+        `WITH calculated_projects AS (
+             SELECT DISTINCT ipr.project_id
              FROM individual_project_results ipr
              JOIN projects p ON p.id_project = ipr.project_id
              WHERE p.id_event = $1
          ),
-         member_area_results AS (
+         team_area_scores AS (
              SELECT
-                 pm.project_id,
-                 pm.user_id,
-                 COALESCE(BOOL_OR(COALESCE(iar.final_score, 0) = 0), false) AS has_zero_area
-             FROM project_members pm
-             LEFT JOIN individual_area_results iar
-               ON iar.project_id = pm.project_id
-              AND iar.user_id    = pm.user_id
-             GROUP BY pm.project_id, pm.user_id
+                 p.id_project,
+                 iar.area,
+                 COALESCE(
+                     AVG(iar.final_score) FILTER (WHERE COALESCE(iar.final_score, 0) <> 0),
+                     0
+                 ) AS area_score
+             FROM projects p
+             JOIN individual_area_results iar ON iar.project_id = p.id_project
+             WHERE p.id_event = $1
+             GROUP BY p.id_project, iar.area
          ),
-         ranked_members AS (
+         team_scores AS (
              SELECT
-                 pm.*,
-                 NOT mar.has_zero_area AS counts_for_team_average
-             FROM project_members pm
-             JOIN member_area_results mar
-               ON mar.project_id = pm.project_id
-              AND mar.user_id    = pm.user_id
+                 id_project,
+                 ROUND(
+                     COALESCE(
+                         (
+                             SUM(area_score * CASE area
+                                 WHEN 'DEVELOPMENT' THEN 0.55
+                                 WHEN 'ENGLISH' THEN 0.25
+                                 WHEN 'SOFT_SKILLS' THEN 0.2
+                                 ELSE 0
+                             END)
+                             / NULLIF(SUM(CASE area
+                                 WHEN 'DEVELOPMENT' THEN 0.55
+                                 WHEN 'ENGLISH' THEN 0.25
+                                 WHEN 'SOFT_SKILLS' THEN 0.2
+                                 ELSE 0
+                             END), 0)
+                         ),
+                         0
+                     )::numeric,
+                     4
+                 ) AS team_score
+             FROM team_area_scores
+             GROUP BY id_project
          )
          SELECT
              p.id_project,
              p.name                                  AS project_name,
              t.id_team,
              t.name                                  AS team_name,
-             ROUND(
-                 COALESCE(AVG(rm.final_score) FILTER (WHERE rm.counts_for_team_average), 0)::numeric,
-                 4
-             ) AS team_score
-         FROM ranked_members rm
-                  JOIN projects p ON p.id_project = rm.project_id
+             COALESCE(ts.team_score, 0)              AS team_score
+         FROM calculated_projects cp
+                  JOIN projects p ON p.id_project = cp.project_id
                   JOIN teams t    ON t.id_team    = p.team_id
+                  LEFT JOIN team_scores ts ON ts.id_project = p.id_project
          WHERE p.id_event = $1
-         GROUP BY p.id_project, p.name, t.id_team, t.name
          ORDER BY team_score DESC
          LIMIT $2`,
         [eventId, limit],

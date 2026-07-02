@@ -67,7 +67,9 @@ export const getEventEvaluationStatus = async (eventId) => {
 /**
  * Returns the full ranking for an event.
  *
- * Team average excludes members with a zero score in any evaluated area.
+ * Team score averages each area independently, excluding only members whose
+ * score is zero in that specific area. Area averages are then combined using
+ * the same weights as individual scores.
  * Ordered by team_score DESC.
  */
 export const getEventRanking = async (eventId) => {
@@ -108,6 +110,59 @@ export const getEventRanking = async (eventId) => {
       JOIN member_area_results mar
         ON mar.project_id = pm.project_id
        AND mar.user_id    = pm.user_id
+    ),
+    team_area_scores AS (
+      SELECT
+        p.id_project,
+        iar.area,
+        COALESCE(
+          AVG(iar.final_score) FILTER (WHERE COALESCE(iar.final_score, 0) <> 0),
+          0
+        ) AS area_score,
+        COUNT(iar.user_id) AS member_count,
+        COUNT(iar.user_id) FILTER (WHERE COALESCE(iar.final_score, 0) <> 0)
+          AS counted_member_count,
+        COUNT(iar.user_id) FILTER (WHERE COALESCE(iar.final_score, 0) = 0)
+          AS zero_member_count
+      FROM projects p
+      JOIN individual_area_results iar ON iar.project_id = p.id_project
+      WHERE p.id_event = $1
+      GROUP BY p.id_project, iar.area
+    ),
+    team_scores AS (
+      SELECT
+        id_project,
+        ROUND(
+          COALESCE(
+            (
+              SUM(area_score * CASE area
+                WHEN 'DEVELOPMENT' THEN 0.55
+                WHEN 'ENGLISH' THEN 0.25
+                WHEN 'SOFT_SKILLS' THEN 0.2
+                ELSE 0
+              END)
+              / NULLIF(SUM(CASE area
+                WHEN 'DEVELOPMENT' THEN 0.55
+                WHEN 'ENGLISH' THEN 0.25
+                WHEN 'SOFT_SKILLS' THEN 0.2
+                ELSE 0
+              END), 0)
+            ),
+            0
+          )::numeric,
+          2
+        ) AS team_score,
+        json_agg(
+          json_build_object(
+            'area', area,
+            'score', ROUND(area_score::numeric, 2),
+            'member_count', member_count,
+            'counted_member_count', counted_member_count,
+            'zero_member_count', zero_member_count
+          ) ORDER BY area
+        ) AS area_breakdown
+      FROM team_area_scores
+      GROUP BY id_project
     )
     SELECT
       p.id_project,
@@ -115,13 +170,11 @@ export const getEventRanking = async (eventId) => {
       p.repo_url,
       t.id_team,
       t.name                                  AS team_name,
-      ROUND(
-        COALESCE(AVG(rm.final_score) FILTER (WHERE rm.counts_for_team_average), 0)::numeric,
-        2
-      ) AS team_score,
+      COALESCE(ts.team_score, 0)              AS team_score,
       COUNT(rm.user_id)                       AS member_count,
       COUNT(rm.user_id) FILTER (WHERE rm.counts_for_team_average)
                                                 AS averaged_member_count,
+      COALESCE(ts.area_breakdown, '[]'::json) AS area_breakdown,
       json_agg(
         json_build_object(
           'user_id',    rm.user_id,
@@ -136,8 +189,9 @@ export const getEventRanking = async (eventId) => {
     JOIN projects p  ON p.id_project  = rm.project_id
     JOIN teams t     ON t.id_team     = p.team_id
     JOIN users u     ON u.id_user     = rm.user_id
+    LEFT JOIN team_scores ts ON ts.id_project = p.id_project
     WHERE p.id_event = $1
-    GROUP BY p.id_project, p.name, p.repo_url, t.id_team, t.name
+    GROUP BY p.id_project, p.name, p.repo_url, t.id_team, t.name, ts.team_score, ts.area_breakdown
     ORDER BY team_score DESC
   `;
   const result = await pool.query(query, [eventId]);
