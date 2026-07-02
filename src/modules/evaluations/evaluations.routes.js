@@ -27,6 +27,13 @@ router.post(
 );
 
 router.get(
+    "/project/:projectId/my/summary",
+    authenticate,
+    canEvaluate,
+    EvaluationsController.getMyEvaluationSummary,
+);
+
+router.get(
     "/project/:projectId/my",
     authenticate,
     canEvaluate,

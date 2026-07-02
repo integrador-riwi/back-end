@@ -40,6 +40,19 @@ const EvaluationsController = {
     return success(res, evaluations);
   }),
 
+  // GET /api/evaluations/project/:projectId/my/summary
+  getMyEvaluationSummary: asyncHandler(async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    const evaluatorUserId = req.user.id_user;
+
+    const summary = await EvaluationsService.getMyEvaluationSummaryForProject(
+        projectId,
+        evaluatorUserId,
+    );
+
+    return success(res, summary);
+  }),
+
   // POST /api/evaluations/project/:projectId/calculate
   // Triggers grade calculation and persists results.
   // Accessible by ADMIN and any TL.

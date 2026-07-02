@@ -122,6 +122,100 @@ export const getEvaluationsByProject = async (projectId, evaluatorUserId) => {
     return result.rows;
 };
 
+export const getEvaluationSummaryByProjectAndEvaluator = async (
+    projectId,
+    evaluatorUserId,
+) => {
+    const query = `
+        WITH member_area_scores AS (
+            SELECT
+                e.project_id,
+                e.evaluator_user_id,
+                e.area,
+                e.evaluated_user_id,
+                u.name AS evaluated_name,
+                u.github_avatar_url,
+                ROUND(
+                    (
+                        SUM(g.score * COALESCE(NULLIF(r.weight, 0), 1))
+                        / NULLIF(SUM(COALESCE(NULLIF(r.weight, 0), 1)), 0)
+                    )::numeric,
+                    2
+                ) AS member_score,
+                COUNT(DISTINCT r.id_rubric) AS rubric_count,
+                MAX(e.created_at) AS last_evaluated_at
+            FROM evaluations e
+                     JOIN grades g ON g.id_grade = e.id_grade
+                     JOIN rubrics r ON r.id_rubric = g.id_rubric
+                     JOIN users u ON u.id_user = e.evaluated_user_id
+            WHERE e.project_id = $1
+              AND e.evaluator_user_id = $2
+            GROUP BY
+                e.project_id,
+                e.evaluator_user_id,
+                e.area,
+                e.evaluated_user_id,
+                u.name,
+                u.github_avatar_url
+        ),
+        area_scores AS (
+            SELECT
+                area,
+                ROUND(
+                    COALESCE(
+                        AVG(member_score) FILTER (WHERE COALESCE(member_score, 0) <> 0),
+                        0
+                    )::numeric,
+                    2
+                ) AS area_score,
+                COUNT(*) AS member_count,
+                COUNT(*) FILTER (WHERE COALESCE(member_score, 0) <> 0)
+                    AS counted_member_count,
+                COUNT(*) FILTER (WHERE COALESCE(member_score, 0) = 0)
+                    AS zero_member_count,
+                MAX(last_evaluated_at) AS last_evaluated_at
+            FROM member_area_scores
+            GROUP BY area
+        )
+        SELECT
+            COALESCE(
+                json_agg(
+                    json_build_object(
+                        'area', area,
+                        'area_score', area_score,
+                        'member_count', member_count,
+                        'counted_member_count', counted_member_count,
+                        'zero_member_count', zero_member_count,
+                        'last_evaluated_at', last_evaluated_at
+                    )
+                    ORDER BY area
+                ),
+                '[]'::json
+            ) AS areas,
+            COALESCE(
+                (
+                    SELECT json_agg(
+                        json_build_object(
+                            'area', area,
+                            'evaluated_user_id', evaluated_user_id,
+                            'evaluated_name', evaluated_name,
+                            'github_avatar_url', github_avatar_url,
+                            'member_score', member_score,
+                            'rubric_count', rubric_count,
+                            'last_evaluated_at', last_evaluated_at
+                        )
+                        ORDER BY area, evaluated_name
+                    )
+                    FROM member_area_scores
+                ),
+                '[]'::json
+            ) AS members
+        FROM area_scores
+    `;
+    const result = await pool.query(query, [projectId, evaluatorUserId]);
+    return result.rows[0] ?? { areas: [], members: [] };
+};
+
 export const getRawEvaluationsForProject = async (projectId) => {
     const query = `
         SELECT
@@ -576,6 +670,7 @@ export default {
     getExistingEvaluation,
     upsertEvaluation,
     getEvaluationsByProject,
+    getEvaluationSummaryByProjectAndEvaluator,
     getRawEvaluationsForProject,
     getRubricsForProject,
     upsertAreaResult,

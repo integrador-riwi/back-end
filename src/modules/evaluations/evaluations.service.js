@@ -215,6 +215,22 @@ export const getMyEvaluationsForProject = async (
   );
 };
 
+export const getMyEvaluationSummaryForProject = async (
+    projectId,
+    evaluatorUserId,
+) => {
+  const projectRes = await pool.query(
+      "SELECT id_project FROM projects WHERE id_project = $1",
+      [projectId],
+  );
+  if (!projectRes.rows[0]) throw new NotFoundError("Project not found.");
+
+  return EvaluationsRepository.getEvaluationSummaryByProjectAndEvaluator(
+      projectId,
+      evaluatorUserId,
+  );
+};
+
 export const calculateProjectGrades = async (projectId, requestingRole) => {
   if (!TL_ROLES.includes(requestingRole)) {
     throw new ForbiddenError("Only Team Leads or Admins can calculate grades.");
@@ -757,6 +773,7 @@ export default {
   getRubricsForEvent,
   submitEvaluations,
   getMyEvaluationsForProject,
+  getMyEvaluationSummaryForProject,
   calculateProjectGrades,
   recalculateExistingEventResults,
   getProjectResults,
