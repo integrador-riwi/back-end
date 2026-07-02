@@ -54,6 +54,13 @@ router.get(
     EvaluationsController.getEventResults,
 );
 
+router.get(
+    "/event/:eventId/grade-audit",
+    authenticate,
+    hasRole("ADMIN"),
+    EvaluationsController.getGradeAuditByEvent,
+);
+
 router.post(
     "/event/:eventId/recalculate-existing-results",
     authenticate,

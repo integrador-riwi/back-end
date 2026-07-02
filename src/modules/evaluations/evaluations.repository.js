@@ -484,6 +484,60 @@ export const getEventResults = async (eventId) => {
     return result.rows;
 };
 
+export const getGradeAuditByEvent = async (eventId) => {
+    const query = `
+        SELECT
+            e.id_evaluation,
+            e.project_id,
+            p.name AS project_name,
+            t.id_team,
+            t.name AS team_name,
+            e.area,
+            e.id_grade,
+            e.feedback,
+            e.created_at AS evaluated_at,
+            evaluator.id_user AS evaluator_user_id,
+            evaluator.name AS evaluator_name,
+            evaluator.email AS evaluator_email,
+            evaluator.role AS evaluator_role,
+            evaluator.clan AS evaluator_clan,
+            evaluated.id_user AS evaluated_user_id,
+            evaluated.name AS evaluated_name,
+            evaluated.email AS evaluated_email,
+            evaluated.role AS evaluated_role,
+            evaluated.clan AS evaluated_clan,
+            r.id_rubric,
+            r.name AS rubric_name,
+            r.description AS rubric_description,
+            r.weight AS rubric_weight,
+            g.score AS grade_score,
+            g.name AS grade_name,
+            g.description AS grade_description,
+            iar.final_score AS calculated_area_score,
+            iar.calculated_at AS area_calculated_at,
+            ipr.final_score AS calculated_project_score,
+            ipr.calculated_at AS project_calculated_at
+        FROM evaluations e
+                 JOIN projects p ON p.id_project = e.project_id
+                 JOIN teams t ON t.id_team = p.team_id
+                 JOIN users evaluator ON evaluator.id_user = e.evaluator_user_id
+                 JOIN users evaluated ON evaluated.id_user = e.evaluated_user_id
+                 JOIN grades g ON g.id_grade = e.id_grade
+                 JOIN rubrics r ON r.id_rubric = g.id_rubric
+                 LEFT JOIN individual_area_results iar
+                           ON iar.project_id = e.project_id
+                          AND iar.user_id = e.evaluated_user_id
+                          AND iar.area = e.area
+                 LEFT JOIN individual_project_results ipr
+                           ON ipr.project_id = e.project_id
+                          AND ipr.user_id = e.evaluated_user_id
+        WHERE p.id_event = $1
+        ORDER BY t.name, p.name, e.area, evaluated.name, evaluator.name, r.name, e.created_at DESC
+    `;
+    const result = await pool.query(query, [eventId]);
+    return result.rows;
+};
+
 export default {
     getRubricsByEvent,
     getGradesByRubric,
@@ -501,6 +555,7 @@ export default {
     updateProjectResult,
     getProjectResults,
     getEventResults,
+    getGradeAuditByEvent,
     countEvaluatorsForArea,
     hasEvaluatorSubmittedArea,
     getEventEvalStatus,

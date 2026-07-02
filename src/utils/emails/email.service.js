@@ -1,7 +1,16 @@
 import { Resend } from 'resend';
 
-// Initialize Resend with the API key from environment variables
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resend = null;
+
+const getResendClient = () => {
+    if (!process.env.RESEND_API_KEY) {
+        throw new Error('RESEND_API_KEY is required to send emails.');
+    }
+    if (!resend) {
+        resend = new Resend(process.env.RESEND_API_KEY);
+    }
+    return resend;
+};
 
 export const sendEmail = async ({ toEmail, toName, subject, html }) => {
     const fromAddress = process.env.EMAIL_FROM || 'onboarding@resend.dev';
@@ -13,7 +22,7 @@ export const sendEmail = async ({ toEmail, toName, subject, html }) => {
   - Subject: ${subject}
   - API Key set: ${apiKeySet}`);
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResendClient().emails.send({
         from: `TeamUp <${fromAddress}>`,
         to: [toEmail],
         subject: subject,

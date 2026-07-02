@@ -75,6 +75,18 @@ const EvaluationsController = {
     return success(res, results);
   }),
 
+  // GET /api/evaluations/event/:eventId/grade-audit
+  // Returns raw evaluation audit rows plus calculated result snapshots.
+  getGradeAuditByEvent: asyncHandler(async (req, res) => {
+    const eventId = parseInt(req.params.eventId);
+    const requestingRole = req.user.role;
+    const audit = await EvaluationsService.getGradeAuditByEvent(
+        eventId,
+        requestingRole,
+    );
+    return success(res, audit);
+  }),
+
   // POST /api/evaluations/event/:eventId/recalculate-existing-results
   // Updates only already-created calculated rows. It does not insert missing
   // individual_project_results or individual_area_results records.

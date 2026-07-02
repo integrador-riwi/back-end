@@ -715,6 +715,40 @@ export const getEventResults = async (eventId) => {
   return rows;
 };
 
+export const getGradeAuditByEvent = async (eventId, requestingRole) => {
+  if (requestingRole !== "ADMIN") {
+    throw new ForbiddenError("Only Admins can access grade audit data.");
+  }
+
+  const eventRes = await pool.query(
+      "SELECT id_event, title, event_name FROM events WHERE id_event = $1",
+      [eventId],
+  );
+  if (!eventRes.rows[0]) throw new NotFoundError("Event not found.");
+
+  const rows = await EvaluationsRepository.getGradeAuditByEvent(eventId);
+  const teamIds = new Set(rows.map((row) => row.id_team).filter(Boolean));
+  const projectIds = new Set(rows.map((row) => row.project_id).filter(Boolean));
+  const evaluatorIds = new Set(rows.map((row) => row.evaluator_user_id).filter(Boolean));
+  const evaluatedIds = new Set(rows.map((row) => row.evaluated_user_id).filter(Boolean));
+  const areas = new Set(rows.map((row) => row.area).filter(Boolean));
+  const zeroScores = rows.filter((row) => Number(row.grade_score) === 0).length;
+
+  return {
+    event: eventRes.rows[0],
+    summary: {
+      evaluations: rows.length,
+      teams: teamIds.size,
+      projects: projectIds.size,
+      evaluators: evaluatorIds.size,
+      evaluatedMembers: evaluatedIds.size,
+      areas: Array.from(areas).sort(),
+      zeroScores,
+    },
+    rows,
+  };
+};
+
 export default {
   getRubricsForEvent,
   submitEvaluations,
@@ -723,6 +757,7 @@ export default {
   recalculateExistingEventResults,
   getProjectResults,
   getEventResults,
+  getGradeAuditByEvent,
   closeEventEvaluations,
   reopenEventEvaluations,
   getProjectEvalStatus,
