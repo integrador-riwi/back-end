@@ -752,7 +752,7 @@ export const getGradeAuditByEvent = async (eventId, requestingRole) => {
   );
   if (!eventRes.rows[0]) throw new NotFoundError("Event not found.");
 
-  const [rows, areaSummary] = await Promise.all([
+  const [rows, auditSummary] = await Promise.all([
     EvaluationsRepository.getGradeAuditByEvent(eventId),
     EvaluationsRepository.getTeamAreaAuditSummaryByEvent(eventId),
   ]);
@@ -774,7 +774,8 @@ export const getGradeAuditByEvent = async (eventId, requestingRole) => {
       areas: Array.from(areas).sort(),
       zeroScores,
     },
-    areaSummary,
+    areaSummary: auditSummary.area_summary ?? [],
+    teamSummary: auditSummary.team_summary ?? [],
     rows,
   };
 };

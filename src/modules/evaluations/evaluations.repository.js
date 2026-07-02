@@ -704,34 +704,178 @@ export const getGradeAuditByEvent = async (eventId) => {
 
 export const getTeamAreaAuditSummaryByEvent = async (eventId) => {
     const query = `
+        WITH required_areas AS (
+            SELECT COUNT(DISTINCT area) AS required_area_count
+            FROM rubrics
+            WHERE id_event = $1
+              AND active = true
+        ),
+        rubric_scores AS (
+            SELECT
+                p.id_project,
+                p.name AS project_name,
+                t.id_team,
+                t.name AS team_name,
+                e.area,
+                e.evaluated_user_id,
+                r.id_rubric,
+                COALESCE(NULLIF(r.weight, 0), 1) AS rubric_weight,
+                AVG(g.score) AS rubric_score,
+                COUNT(DISTINCT e.evaluator_user_id) AS evaluator_count,
+                MAX(e.created_at) AS last_evaluated_at
+            FROM evaluations e
+                     JOIN projects p ON p.id_project = e.project_id
+                     JOIN teams t ON t.id_team = p.team_id
+                     JOIN grades g ON g.id_grade = e.id_grade
+                     JOIN rubrics r ON r.id_rubric = g.id_rubric
+            WHERE p.id_event = $1
+            GROUP BY
+                p.id_project,
+                p.name,
+                t.id_team,
+                t.name,
+                e.area,
+                e.evaluated_user_id,
+                r.id_rubric,
+                r.weight
+        ),
+        member_area_scores AS (
+            SELECT
+                id_project,
+                project_name,
+                id_team,
+                team_name,
+                area,
+                evaluated_user_id,
+                ROUND(
+                    (
+                        SUM(rubric_score * rubric_weight)
+                        / NULLIF(SUM(rubric_weight), 0)
+                    )::numeric,
+                    2
+                ) AS member_score,
+                COUNT(id_rubric) AS rubric_count,
+                SUM(evaluator_count) AS evaluation_count,
+                MAX(last_evaluated_at) AS last_evaluated_at
+            FROM rubric_scores
+            GROUP BY
+                id_project,
+                project_name,
+                id_team,
+                team_name,
+                area,
+                evaluated_user_id
+        ),
+        area_scores AS (
+            SELECT
+                id_project,
+                project_name,
+                id_team,
+                team_name,
+                area,
+                ROUND(
+                    COALESCE(
+                        AVG(member_score) FILTER (WHERE COALESCE(member_score, 0) <> 0),
+                        0
+                    )::numeric,
+                    2
+                ) AS area_score,
+                COUNT(evaluated_user_id) AS member_count,
+                COUNT(evaluated_user_id) FILTER (WHERE COALESCE(member_score, 0) <> 0)
+                    AS counted_member_count,
+                COUNT(evaluated_user_id) FILTER (WHERE COALESCE(member_score, 0) = 0)
+                    AS zero_member_count,
+                SUM(evaluation_count) AS evaluation_count,
+                MAX(last_evaluated_at) AS last_evaluated_at
+            FROM member_area_scores
+            GROUP BY id_project, project_name, id_team, team_name, area
+        ),
+        team_scores AS (
+            SELECT
+                area_scores.id_project,
+                area_scores.project_name,
+                area_scores.id_team,
+                area_scores.team_name,
+                ROUND(
+                    COALESCE(
+                        (
+                            SUM(area_score * CASE area
+                                WHEN 'DEVELOPMENT' THEN 0.55
+                                WHEN 'ENGLISH' THEN 0.25
+                                WHEN 'SOFT_SKILLS' THEN 0.2
+                                ELSE 0
+                            END)
+                            / NULLIF(SUM(CASE area
+                                WHEN 'DEVELOPMENT' THEN 0.55
+                                WHEN 'ENGLISH' THEN 0.25
+                                WHEN 'SOFT_SKILLS' THEN 0.2
+                                ELSE 0
+                            END), 0)
+                        ),
+                        0
+                    )::numeric,
+                    2
+                ) AS team_score,
+                COUNT(DISTINCT area) AS evaluated_area_count,
+                MAX(required_areas.required_area_count) AS required_area_count,
+                MAX(last_evaluated_at) AS last_evaluated_at
+            FROM area_scores
+                     CROSS JOIN required_areas
+            GROUP BY
+                area_scores.id_project,
+                area_scores.project_name,
+                area_scores.id_team,
+                area_scores.team_name
+        )
         SELECT
-            p.id_project,
-            p.name AS project_name,
-            t.id_team,
-            t.name AS team_name,
-            iar.area,
-            ROUND(
-                COALESCE(
-                    AVG(iar.final_score) FILTER (WHERE COALESCE(iar.final_score, 0) <> 0),
-                    0
-                )::numeric,
-                2
-            ) AS area_score,
-            COUNT(iar.user_id) AS member_count,
-            COUNT(iar.user_id) FILTER (WHERE COALESCE(iar.final_score, 0) <> 0)
-                AS counted_member_count,
-            COUNT(iar.user_id) FILTER (WHERE COALESCE(iar.final_score, 0) = 0)
-                AS zero_member_count,
-            MAX(iar.calculated_at) AS last_calculated_at
-        FROM projects p
-                 JOIN teams t ON t.id_team = p.team_id
-                 JOIN individual_area_results iar ON iar.project_id = p.id_project
-        WHERE p.id_event = $1
-        GROUP BY p.id_project, p.name, t.id_team, t.name, iar.area
-        ORDER BY t.name, p.name, iar.area
+            COALESCE(
+                (
+                    SELECT json_agg(
+                        json_build_object(
+                            'id_project', area_scores.id_project,
+                            'project_name', area_scores.project_name,
+                            'id_team', area_scores.id_team,
+                            'team_name', area_scores.team_name,
+                            'area', area_scores.area,
+                            'area_score', area_scores.area_score,
+                            'team_score', team_scores.team_score,
+                            'member_count', area_scores.member_count,
+                            'counted_member_count', area_scores.counted_member_count,
+                            'zero_member_count', area_scores.zero_member_count,
+                            'evaluation_count', area_scores.evaluation_count,
+                            'last_calculated_at', area_scores.last_evaluated_at,
+                            'is_complete', team_scores.evaluated_area_count >= team_scores.required_area_count
+                        )
+                        ORDER BY area_scores.team_name, area_scores.project_name, area_scores.area
+                    )
+                    FROM area_scores
+                             JOIN team_scores ON team_scores.id_project = area_scores.id_project
+                ),
+                '[]'::json
+            ) AS area_summary,
+            COALESCE(
+                (
+                    SELECT json_agg(
+                        json_build_object(
+                            'id_project', id_project,
+                            'project_name', project_name,
+                            'id_team', id_team,
+                            'team_name', team_name,
+                            'team_score', team_score,
+                            'evaluated_area_count', evaluated_area_count,
+                            'required_area_count', required_area_count,
+                            'is_complete', evaluated_area_count >= required_area_count,
+                            'last_calculated_at', last_evaluated_at
+                        )
+                        ORDER BY team_name, project_name
+                    )
+                    FROM team_scores
+                ),
+                '[]'::json
+            ) AS team_summary
     `;
     const result = await pool.query(query, [eventId]);
-    return result.rows;
+    return result.rows[0] ?? { area_summary: [], team_summary: [] };
 };
 
 export default {
