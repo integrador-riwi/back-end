@@ -80,6 +80,14 @@ const EvaluationsController = {
     return success(res, results);
   }),
 
+  // GET /api/evaluations/project/:projectId/results/summary
+  // Returns persisted project score and area summaries.
+  getProjectResultsSummary: asyncHandler(async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    const summary = await EvaluationsService.getProjectResultsSummary(projectId);
+    return success(res, summary);
+  }),
+
   // GET /api/evaluations/event/:eventId/results
   // Returns persisted grade results for all projects in an event.
   getEventResults: asyncHandler(async (req, res) => {

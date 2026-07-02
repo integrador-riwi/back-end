@@ -710,6 +710,16 @@ export const getProjectResults = async (projectId) => {
   return rows;
 };
 
+export const getProjectResultsSummary = async (projectId) => {
+  const projectRes = await pool.query(
+      "SELECT id_project FROM projects WHERE id_project = $1",
+      [projectId],
+  );
+  if (!projectRes.rows[0]) throw new NotFoundError("Project not found.");
+
+  return EvaluationsRepository.getProjectResultsSummary(projectId);
+};
+
 // ── Read persisted results for an entire event ───────────────────────────────
 
 export const getEventResults = async (eventId) => {
@@ -777,6 +787,7 @@ export default {
   calculateProjectGrades,
   recalculateExistingEventResults,
   getProjectResults,
+  getProjectResultsSummary,
   getEventResults,
   getGradeAuditByEvent,
   closeEventEvaluations,

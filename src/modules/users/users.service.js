@@ -230,10 +230,31 @@ export const getPublicProfile = async (userId, viewerRole, requesterId = null) =
       userId,
       onlySubmitted,
   );
+  const visibleProjects = isPrivileged
+      ? projects
+      : projects.filter((project) => project.event_status === "COMPLETED");
+  const gradedProjects = visibleProjects.filter(
+      (project) => project.project_final_grade !== null && project.project_final_grade !== undefined,
+  );
+  const projectStats = {
+    count: visibleProjects.length,
+    avg: gradedProjects.length > 0
+        ? Math.round(
+            gradedProjects.reduce(
+                (sum, project) => sum + Number(project.project_final_grade),
+                0,
+            ) / gradedProjects.length,
+        )
+        : null,
+    best: gradedProjects.length > 0
+        ? Math.max(...gradedProjects.map((project) => Number(project.project_final_grade)))
+        : null,
+  };
 
   return {
     ...user,
     projects,
+    project_stats: projectStats,
   };
 };
 

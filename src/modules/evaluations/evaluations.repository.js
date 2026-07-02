@@ -386,6 +386,76 @@ export const getProjectResults = async (projectId) => {
     return result.rows;
 };
 
+export const getProjectResultsSummary = async (projectId) => {
+    const query = `
+        WITH team_area_scores AS (
+            SELECT
+                area,
+                ROUND(
+                    COALESCE(
+                        AVG(final_score) FILTER (WHERE COALESCE(final_score, 0) <> 0),
+                        0
+                    )::numeric,
+                    2
+                ) AS area_score,
+                COUNT(user_id) AS member_count,
+                COUNT(user_id) FILTER (WHERE COALESCE(final_score, 0) <> 0)
+                    AS counted_member_count,
+                COUNT(user_id) FILTER (WHERE COALESCE(final_score, 0) = 0)
+                    AS zero_member_count,
+                MAX(calculated_at) AS last_calculated_at
+            FROM individual_area_results
+            WHERE project_id = $1
+            GROUP BY area
+        ),
+        project_score AS (
+            SELECT
+                ROUND(
+                    COALESCE(
+                        (
+                            SUM(area_score * CASE area
+                                WHEN 'DEVELOPMENT' THEN 0.55
+                                WHEN 'ENGLISH' THEN 0.25
+                                WHEN 'SOFT_SKILLS' THEN 0.2
+                                ELSE 0
+                            END)
+                            / NULLIF(SUM(CASE area
+                                WHEN 'DEVELOPMENT' THEN 0.55
+                                WHEN 'ENGLISH' THEN 0.25
+                                WHEN 'SOFT_SKILLS' THEN 0.2
+                                ELSE 0
+                            END), 0)
+                        ),
+                        0
+                    )::numeric,
+                    2
+                ) AS final_score
+            FROM team_area_scores
+        )
+        SELECT
+            COALESCE((SELECT final_score FROM project_score), 0) AS project_score,
+            COALESCE(
+                (
+                    SELECT json_agg(
+                        json_build_object(
+                            'area', area,
+                            'score', area_score,
+                            'member_count', member_count,
+                            'counted_member_count', counted_member_count,
+                            'zero_member_count', zero_member_count,
+                            'last_calculated_at', last_calculated_at
+                        )
+                        ORDER BY area
+                    )
+                    FROM team_area_scores
+                ),
+                '[]'::json
+            ) AS area_summary
+    `;
+    const result = await pool.query(query, [projectId]);
+    return result.rows[0] ?? { project_score: 0, area_summary: [] };
+};
+
 // ── Evaluator counts per area per project ────────────────────────────────────
 
 /**
@@ -681,6 +751,7 @@ export default {
     updateAreaResult,
     updateProjectResult,
     getProjectResults,
+    getProjectResultsSummary,
     getEventResults,
     getGradeAuditByEvent,
     getTeamAreaAuditSummaryByEvent,

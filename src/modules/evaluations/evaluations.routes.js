@@ -48,6 +48,13 @@ router.post(
 );
 
 router.get(
+    "/project/:projectId/results/summary",
+    authenticate,
+    canEvaluate,
+    EvaluationsController.getProjectResultsSummary,
+);
+
+router.get(
     "/project/:projectId/results",
     authenticate,
     canEvaluate,
