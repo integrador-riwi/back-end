@@ -76,12 +76,9 @@ export const publishRanking = async (eventId, requestingRole) => {
 
   const status = await getRankingStatus(eventId);
 
+  // Teams that aren't fully evaluated yet are skipped (not blocking) so the
+  // ranking/voting flow can start as soon as any team is graded.
   const incompleteProjects = status.projects.filter((p) => !p.fullyEvaluated);
-  if (incompleteProjects.length > 0) {
-    throw new ValidationError(
-        "No se puede publicar el ranking hasta que cada proyecto tenga al menos una calificación por cada área activa.",
-    );
-  }
 
   const evaluationWarnings = incompleteProjects.map((p) => ({
     projectId: p.id,
