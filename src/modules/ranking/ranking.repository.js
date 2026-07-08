@@ -152,8 +152,8 @@ export const getEventRanking = async (eventId) => {
           )::numeric,
           2
         ) AS team_score,
-        json_agg(
-          json_build_object(
+        jsonb_agg(
+          jsonb_build_object(
             'area', area,
             'score', ROUND(area_score::numeric, 2),
             'member_count', member_count,
@@ -174,7 +174,7 @@ export const getEventRanking = async (eventId) => {
       COUNT(rm.user_id)                       AS member_count,
       COUNT(rm.user_id) FILTER (WHERE rm.counts_for_team_average)
                                                 AS averaged_member_count,
-      COALESCE(ts.area_breakdown, '[]'::json) AS area_breakdown,
+      COALESCE(ts.area_breakdown, '[]'::jsonb) AS area_breakdown,
       json_agg(
         json_build_object(
           'user_id',    rm.user_id,
