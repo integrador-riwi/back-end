@@ -1,0 +1,9 @@
+node_modules
+.git
+.github
+.idea
+.env
+.env.example
+*.md
+backend.zip
+users.test.json
