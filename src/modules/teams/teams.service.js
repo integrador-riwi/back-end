@@ -335,14 +335,6 @@ export const addMemberToTeam = async (teamId, memberData, userId, userRole) => {
     );
   }
 
-  // Block if project has been submitted
-  const project = await ProjectsRepository.findByTeamId(teamId);
-  if (project?.submitted_at) {
-    throw new ForbiddenError(
-      "El proyecto ya fue entregado. No se pueden agregar miembros.",
-    );
-  }
-
   if (!memberData.userId) {
     throw new ValidationError("El ID del usuario es requerido");
   }
